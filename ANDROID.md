@@ -1,0 +1,47 @@
+# Сборка Android APK (Capacitor)
+
+Внутри Lovable APK не собирается — сборка идёт локально в Android Studio.
+
+## Что нужно
+- Android Studio (последняя версия) + Android SDK
+- JDK 17
+- Node.js 20+
+
+## Шаги
+1. Экспортируйте проект в GitHub (кнопка **GitHub → Export to GitHub** справа сверху) и клонируйте репозиторий:
+   ```bash
+   git clone <ваш-репозиторий>
+   cd <папка-проекта>
+   npm install
+   ```
+2. Добавьте платформу Android (один раз):
+   ```bash
+   npx cap add android
+   ```
+3. Соберите веб-часть и синхронизируйте:
+   ```bash
+   npm run build
+   npx cap sync android
+   ```
+4. Откройте нативный проект:
+   ```bash
+   npx cap open android
+   ```
+5. В Android Studio: **Build → Build Bundle(s)/APK(s) → Build APK(s)**.
+   Готовый файл: `android/app/build/outputs/apk/debug/app-debug.apk` — его можно скинуть отцу на телефон и установить.
+
+## Про `capacitor.config.ts`
+Сейчас в конфиге указан `server.url` — приложение открывает живую версию сайта, поэтому любые обновления в Lovable сразу видны в APK без пересборки. Требуется интернет.
+
+Опубликуете проект — замените `server.url` на ваш домен (`https://<ваш-проект>.lovable.app`), затем `npx cap sync android`.
+
+## После каждого обновления кода
+```bash
+git pull
+npm install
+npm run build
+npx cap sync android
+```
+
+## Релизный APK (для установки без предупреждений)
+В Android Studio: **Build → Generate Signed Bundle / APK → APK**, создайте keystore и сохраните его — он нужен для всех будущих обновлений.
