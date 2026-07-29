@@ -256,6 +256,27 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </p>
           ) : null}
 
+          <Field label="Доставка техники, ₽">
+            <input
+              type="number"
+              min="0"
+              value={delivery}
+              onChange={(e) => setDelivery(e.target.value)}
+              className="input"
+              placeholder="0"
+            />
+          </Field>
+
+          <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2.5">
+            <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+              Итого
+            </span>
+            <span className="font-display text-xl text-primary">
+              {formatMoney((Number(price) || 0) + (Number(delivery) || 0))}
+            </span>
+          </div>
+
+
           <Field label="Статус">
             <div className="grid grid-cols-2 gap-2">
               {(
