@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSettings } from "@/lib/tracker-storage";
+import { useYandexKey } from "@/lib/tracker-storage";
 import { Crosshair, Loader2, Search } from "lucide-react";
 
 declare global {
