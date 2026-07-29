@@ -133,23 +133,32 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
     const ymaps = ymapsRef.current;
     const text = query.trim() || address.trim();
     if (!ymaps || !mapRef.current || !text) return;
-    ymaps.geocode(text, { results: 1 }).then((res: any) => {
-      const first = res.geoObjects.get(0);
-      if (!first) return;
-      const coords = first.geometry.getCoordinates();
-      mapRef.current.setCenter(coords, 16);
-      if (!markRef.current) {
-        markRef.current = new ymaps.Placemark(
-          coords,
-          {},
-          { draggable: true, preset: "islands#orangeDotIcon" },
-        );
-        mapRef.current.geoObjects.add(markRef.current);
-      } else {
-        markRef.current.geometry.setCoordinates(coords);
-      }
-      onPickRef.current(coords[0], coords[1], first.getAddressLine());
-    });
+    forwardGeocode(geoKeyRef.current, text)
+      .then((r) => {
+        if (!r || Number.isNaN(r.lat)) return;
+        const coords = [r.lat, r.lng];
+        mapRef.current.setCenter(coords, 16);
+        if (!markRef.current) {
+          markRef.current = new ymaps.Placemark(
+            coords,
+            {},
+            { draggable: true, preset: "islands#orangeDotIcon" },
+          );
+          markRef.current.events.add("dragend", () => {
+            const c = markRef.current.geometry.getCoordinates();
+            onPickRef.current(c[0], c[1]);
+            reverseGeocode(geoKeyRef.current, c[0], c[1])
+              .then((rr) => onPickRef.current(c[0], c[1], rr?.address || undefined))
+              .catch(() => undefined);
+          });
+          mapRef.current.geoObjects.add(markRef.current);
+        } else {
+          markRef.current.geometry.setCoordinates(coords);
+        }
+        onPickRef.current(r.lat, r.lng, r.address || undefined);
+      })
+      .catch(() => setError("Не удалось найти адрес"));
+
   }
 
   if (!apiKey) {
