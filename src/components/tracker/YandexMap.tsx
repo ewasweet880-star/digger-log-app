@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useGeocoderKey, useYandexKey } from "@/lib/tracker-storage";
 import { forwardGeocode, reverseGeocode } from "@/lib/yandex-geocode";
-import { Crosshair, Loader2, Search } from "lucide-react";
+import { Crosshair, Loader2, LocateFixed, Search } from "lucide-react";
+import { GEO_ERROR_TEXT, geolocationSupported, getCurrentPosition } from "@/lib/geo";
 
 
 declare global {
