@@ -95,18 +95,13 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
 
         const resolveAddress = (coords: number[]) => {
           onPickRef.current(coords[0], coords[1]);
-          ymaps
-            .geocode(coords, { results: 1 })
-            .then((res: any) => {
-              const first = res.geoObjects.get(0);
-              onPickRef.current(
-                coords[0],
-                coords[1],
-                first ? first.getAddressLine() : undefined,
-              );
+          reverseGeocode(geoKeyRef.current, coords[0], coords[1])
+            .then((r) => {
+              onPickRef.current(coords[0], coords[1], r?.address || undefined);
             })
             .catch(() => undefined);
         };
+
 
         map.events.add("click", (e: any) => place(e.get("coords")));
         if (lat != null && lng != null) place([lat, lng], false);
