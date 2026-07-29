@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export type OrderStatus = "planned" | "in_progress" | "done" | "cancelled";
 
