@@ -142,8 +142,16 @@ export interface Settings {
   yandexApiKey?: string;
 }
 
+/** Ключ по умолчанию (MapKit SDK Key #5), можно заменить в «Настройках». */
+export const DEFAULT_YANDEX_KEY = "29940867-f58f-46d9-8d8f-193828991a6d";
+
 export function useSettings() {
   return useKey<Settings>(KEY_SETTINGS, {});
+}
+
+export function useYandexKey() {
+  const [settings] = useSettings();
+  return settings.yandexApiKey?.trim() || DEFAULT_YANDEX_KEY;
 }
 
 export const MONTHS_RU = [
