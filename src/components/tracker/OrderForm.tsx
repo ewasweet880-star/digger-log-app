@@ -97,7 +97,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       date,
       hours: hours ? Number(hours) : undefined,
       price: price ? Number(price) : 0,
+      delivery: delivery ? Number(delivery) : undefined,
       paid,
+
       status,
       notes: notes || undefined,
       createdAt: editing?.createdAt ?? new Date().toISOString(),
