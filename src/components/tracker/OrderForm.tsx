@@ -37,6 +37,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   );
   const [hours, setHours] = useState(editing?.hours?.toString() ?? "");
   const [price, setPrice] = useState(editing?.price?.toString() ?? "");
+  const [delivery, setDelivery] = useState(editing?.delivery?.toString() ?? "");
+
   const [priceTouched, setPriceTouched] = useState(Boolean(editing?.price));
   const [status, setStatus] = useState<OrderStatus>(editing?.status ?? "planned");
   const [paid, setPaid] = useState(editing?.paid ?? false);
