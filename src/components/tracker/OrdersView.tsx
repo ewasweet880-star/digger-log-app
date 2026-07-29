@@ -21,7 +21,9 @@ import {
   XCircle,
   Trash2,
   Pencil,
+  Navigation,
 } from "lucide-react";
+import { canNavigate, openNavigator } from "@/lib/navigate";
 
 const STATUS_META: Record<
   OrderStatus,
