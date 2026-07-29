@@ -90,6 +90,41 @@ export function EarningsView() {
         </div>
       </div>
 
+      <div className="bg-card border border-border rounded-3xl p-5">
+        <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Чистая прибыль за месяц
+        </div>
+        <div
+          className={`font-display text-4xl mt-1 ${
+            stats.month - exp.month >= 0
+              ? "text-[color:var(--success)]"
+              : "text-destructive"
+          }`}
+        >
+          {formatMoney(stats.month - exp.month)}
+        </div>
+        <div className="mt-1 text-sm text-muted-foreground">
+          Доход {formatMoney(stats.month)} − расходы {formatMoney(exp.month)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          icon={Fuel}
+          label="Топливо, месяц"
+          value={formatMoney(exp.fuelMonth)}
+          accent="text-destructive"
+        />
+        <StatCard
+          icon={Wrench}
+          label="ТО и запчасти"
+          value={formatMoney(exp.serviceMonth)}
+          accent="text-destructive"
+        />
+      </div>
+
+
+
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           icon={Wallet}
