@@ -61,9 +61,8 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               Яндекс.Карты
             </h3>
             <p className="text-sm text-muted-foreground">
-              Ключ уже подставлен по умолчанию. Если карта не грузится, вставьте свой
-              ключ «JavaScript API и HTTP Геокодер» — ключ MapKit SDK работает только в
-              нативном мобильном SDK.
+              Ключ карты (JavaScript API) уже подставлен. Замените его, если карта не
+              грузится.
             </p>
             <div className="flex items-center gap-2">
               <KeyRound className="size-4 text-muted-foreground shrink-0" />
@@ -76,6 +75,22 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                 placeholder={DEFAULT_YANDEX_KEY}
               />
             </div>
+
+            <p className="text-sm text-muted-foreground pt-2">
+              Ключ «API Геокодера» — определяет адрес по точке на карте и ищет адрес
+              по названию.
+            </p>
+            <div className="flex items-center gap-2">
+              <MapPin className="size-4 text-muted-foreground shrink-0" />
+              <input
+                value={settings.yandexGeocoderKey ?? ""}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, yandexGeocoderKey: e.target.value }))
+                }
+                className="input"
+                placeholder={DEFAULT_GEOCODER_KEY}
+              />
+            </div>
             <a
               href="https://developer.tech.yandex.ru/services"
               target="_blank"
@@ -85,6 +100,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               Получить ключ <ExternalLink className="size-3.5" />
             </a>
           </section>
+
         </div>
 
         <div className="sticky bottom-0 p-4 bg-card border-t border-border">
