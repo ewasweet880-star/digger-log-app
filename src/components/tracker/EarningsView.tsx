@@ -1,9 +1,29 @@
 import { useMemo } from "react";
-import { useOrders, formatMoney, orderTotal } from "@/lib/tracker-storage";
-import { TrendingUp, Wallet, Clock, CheckCircle2 } from "lucide-react";
+import { useOrders, useExpenses, formatMoney, orderTotal } from "@/lib/tracker-storage";
+import { TrendingUp, Wallet, Clock, CheckCircle2, Fuel, Wrench } from "lucide-react";
 
 export function EarningsView() {
   const [orders] = useOrders();
+  const [expenses] = useExpenses();
+
+  const exp = useMemo(() => {
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    let month = 0,
+      total = 0,
+      fuelMonth = 0,
+      serviceMonth = 0;
+    for (const e of expenses) {
+      total += e.amount || 0;
+      if (e.date.startsWith(key)) {
+        month += e.amount || 0;
+        if (e.category === "fuel") fuelMonth += e.amount || 0;
+        else serviceMonth += e.amount || 0;
+      }
+    }
+    return { month, total, fuelMonth, serviceMonth };
+  }, [expenses]);
+
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -69,6 +89,41 @@ export function EarningsView() {
           </div>
         </div>
       </div>
+
+      <div className="bg-card border border-border rounded-3xl p-5">
+        <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Чистая прибыль за месяц
+        </div>
+        <div
+          className={`font-display text-4xl mt-1 ${
+            stats.month - exp.month >= 0
+              ? "text-[color:var(--success)]"
+              : "text-destructive"
+          }`}
+        >
+          {formatMoney(stats.month - exp.month)}
+        </div>
+        <div className="mt-1 text-sm text-muted-foreground">
+          Доход {formatMoney(stats.month)} − расходы {formatMoney(exp.month)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          icon={Fuel}
+          label="Топливо, месяц"
+          value={formatMoney(exp.fuelMonth)}
+          accent="text-destructive"
+        />
+        <StatCard
+          icon={Wrench}
+          label="ТО и запчасти"
+          value={formatMoney(exp.serviceMonth)}
+          accent="text-destructive"
+        />
+      </div>
+
+
 
       <div className="grid grid-cols-2 gap-3">
         <StatCard

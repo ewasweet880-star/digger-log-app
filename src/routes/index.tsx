@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CalendarDays, ClipboardList, Settings, Users, Wallet } from "lucide-react";
+import { CalendarDays, ClipboardList, Fuel, Settings, Users, Wallet } from "lucide-react";
 import { OrdersView } from "@/components/tracker/OrdersView";
 import { CalendarView } from "@/components/tracker/CalendarView";
 import { ClientsView } from "@/components/tracker/ClientsView";
 import { EarningsView } from "@/components/tracker/EarningsView";
+import { ExpensesView } from "@/components/tracker/ExpensesView";
 import { SettingsView } from "@/components/tracker/SettingsView";
 
 export const Route = createFileRoute("/")({
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/")({
   component: App,
 });
 
-type Tab = "orders" | "calendar" | "clients" | "money";
+type Tab = "orders" | "calendar" | "clients" | "expenses" | "money";
 
 function App() {
   const [tab, setTab] = useState<Tab>("orders");
@@ -60,13 +61,14 @@ function App() {
         {tab === "orders" && <OrdersView />}
         {tab === "calendar" && <CalendarView />}
         {tab === "clients" && <ClientsView />}
+        {tab === "expenses" && <ExpensesView />}
         {tab === "money" && <EarningsView />}
       </main>
 
       {settingsOpen && <SettingsView onClose={() => setSettingsOpen(false)} />}
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border">
-        <div className="max-w-2xl mx-auto grid grid-cols-4">
+        <div className="max-w-2xl mx-auto grid grid-cols-5">
           <TabButton
             active={tab === "orders"}
             onClick={() => setTab("orders")}
@@ -84,6 +86,12 @@ function App() {
             onClick={() => setTab("clients")}
             icon={Users}
             label="Клиенты"
+          />
+          <TabButton
+            active={tab === "expenses"}
+            onClick={() => setTab("expenses")}
+            icon={Fuel}
+            label="Расходы"
           />
           <TabButton
             active={tab === "money"}
@@ -145,5 +153,6 @@ function tabLabel(t: Tab) {
   if (t === "orders") return "Заказы и планирование";
   if (t === "calendar") return "Календарь загрузки";
   if (t === "clients") return "База клиентов";
+  if (t === "expenses") return "Топливо и обслуживание";
   return "Учёт заработка";
 }
