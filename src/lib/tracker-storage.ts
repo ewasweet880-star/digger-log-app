@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { isNativeApp, nativeGet, nativeSet } from "./native-store";
+
 
 export type OrderStatus = "planned" | "in_progress" | "done" | "cancelled";
 
