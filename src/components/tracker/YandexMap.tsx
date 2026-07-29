@@ -1,0 +1,218 @@
+import { useEffect, useRef, useState } from "react";
+import { useSettings } from "@/lib/tracker-storage";
+import { Crosshair, Loader2, Search } from "lucide-react";
+
+declare global {
+  interface Window {
+    ymaps?: any;
+  }
+}
+
+let loaderPromise: Promise<any> | null = null;
+
+function loadYmaps(apiKey: string) {
+  if (loaderPromise) return loaderPromise;
+  loaderPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(
+      apiKey,
+    )}&lang=ru_RU`;
+    script.async = true;
+    script.onerror = () => {
+      loaderPromise = null;
+      reject(new Error("Не удалось загрузить Яндекс.Карты"));
+    };
+    script.onload = () => window.ymaps.ready(() => resolve(window.ymaps));
+    document.head.appendChild(script);
+  });
+  return loaderPromise;
+}
+
+interface Props {
+  lat?: number;
+  lng?: number;
+  address: string;
+  onPick: (lat: number, lng: number, address?: string) => void;
+}
+
+const DEFAULT_CENTER = [55.751244, 37.618423]; // Москва
+
+export function YandexMap({ lat, lng, address, onPick }: Props) {
+  const [settings] = useSettings();
+  const apiKey = settings.yandexApiKey?.trim();
+  const boxRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markRef = useRef<any>(null);
+  const ymapsRef = useRef<any>(null);
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!apiKey) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    loadYmaps(apiKey)
+      .then((ymaps) => {
+        if (cancelled || !boxRef.current || mapRef.current) return;
+        ymapsRef.current = ymaps;
+        const center = lat != null && lng != null ? [lat, lng] : DEFAULT_CENTER;
+        const map = new ymaps.Map(
+          boxRef.current,
+          { center, zoom: lat != null ? 16 : 10, controls: ["zoomControl", "geolocationControl"] },
+          { suppressMapOpenBlock: true },
+        );
+        mapRef.current = map;
+
+        const place = (coords: number[], reverse = true) => {
+          if (!markRef.current) {
+            markRef.current = new ymaps.Placemark(
+              coords,
+              {},
+              { draggable: true, preset: "islands#orangeDotIcon" },
+            );
+            markRef.current.events.add("dragend", () => {
+              const c = markRef.current.geometry.getCoordinates();
+              resolveAddress(c);
+            });
+            map.geoObjects.add(markRef.current);
+          } else {
+            markRef.current.geometry.setCoordinates(coords);
+          }
+          if (reverse) resolveAddress(coords);
+        };
+
+        const resolveAddress = (coords: number[]) => {
+          onPickRef.current(coords[0], coords[1]);
+          ymaps
+            .geocode(coords, { results: 1 })
+            .then((res: any) => {
+              const first = res.geoObjects.get(0);
+              onPickRef.current(
+                coords[0],
+                coords[1],
+                first ? first.getAddressLine() : undefined,
+              );
+            })
+            .catch(() => undefined);
+        };
+
+        map.events.add("click", (e: any) => place(e.get("coords")));
+        if (lat != null && lng != null) place([lat, lng], false);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e.message);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey]);
+
+  useEffect(() => {
+    return () => {
+      mapRef.current?.destroy?.();
+      mapRef.current = null;
+      markRef.current = null;
+    };
+  }, []);
+
+  function search(e: React.FormEvent) {
+    e.preventDefault();
+    const ymaps = ymapsRef.current;
+    const text = query.trim() || address.trim();
+    if (!ymaps || !mapRef.current || !text) return;
+    ymaps.geocode(text, { results: 1 }).then((res: any) => {
+      const first = res.geoObjects.get(0);
+      if (!first) return;
+      const coords = first.geometry.getCoordinates();
+      mapRef.current.setCenter(coords, 16);
+      if (!markRef.current) {
+        markRef.current = new ymaps.Placemark(
+          coords,
+          {},
+          { draggable: true, preset: "islands#orangeDotIcon" },
+        );
+        mapRef.current.geoObjects.add(markRef.current);
+      } else {
+        markRef.current.geometry.setCoordinates(coords);
+      }
+      onPickRef.current(coords[0], coords[1], first.getAddressLine());
+    });
+  }
+
+  if (!apiKey) {
+    return (
+      <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+        Чтобы показывать карту, добавьте бесплатный API-ключ Яндекс.Карт в разделе
+        «Настройки».
+        {lat != null && lng != null && (
+          <a
+            className="block mt-2 text-primary font-semibold"
+            href={`https://yandex.ru/maps/?pt=${lng},${lat}&z=16&l=map`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Открыть точку в Яндекс.Картах
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") search(e as unknown as React.FormEvent);
+          }}
+          className="input"
+          placeholder={address || "Найти адрес на карте"}
+        />
+        <button
+          type="button"
+          onClick={search}
+          className="px-4 rounded-xl bg-secondary text-secondary-foreground"
+          aria-label="Найти"
+        >
+          <Search className="size-5" />
+        </button>
+      </div>
+
+      <div className="relative h-56 rounded-xl overflow-hidden border border-border">
+        <div ref={boxRef} className="absolute inset-0" />
+        {loading && (
+          <div className="absolute inset-0 grid place-items-center bg-secondary">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 grid place-items-center bg-secondary p-4 text-center text-sm text-destructive">
+            {error}
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+        <Crosshair className="size-3.5" />
+        {lat != null && lng != null
+          ? `Точка: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+          : "Нажмите на карту, чтобы отметить место работы"}
+      </p>
+    </div>
+  );
+}
