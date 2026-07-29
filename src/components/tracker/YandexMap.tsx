@@ -41,12 +41,16 @@ const DEFAULT_CENTER = [55.751244, 37.618423]; // Москва
 
 export function YandexMap({ lat, lng, address, onPick }: Props) {
   const apiKey = useYandexKey();
+  const geocoderKey = useGeocoderKey();
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markRef = useRef<any>(null);
   const ymapsRef = useRef<any>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const geoKeyRef = useRef(geocoderKey);
+  geoKeyRef.current = geocoderKey;
+
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
