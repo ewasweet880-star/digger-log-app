@@ -16,6 +16,8 @@ export interface Order {
   status: OrderStatus;
   notes?: string;
   createdAt: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Client {
