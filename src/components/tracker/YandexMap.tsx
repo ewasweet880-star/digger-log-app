@@ -248,6 +248,22 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={locate}
+        disabled={locating || !geolocationSupported()}
+        className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {locating ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <LocateFixed className="size-4" />
+        )}
+        {locating ? "Определяю..." : "Я здесь — моё местоположение"}
+      </button>
+
+      {geoError && <p className="text-xs text-destructive">{geoError}</p>}
+
       <div className="relative h-56 rounded-xl overflow-hidden border border-border">
         <div ref={boxRef} className="absolute inset-0" />
         {loading && (
@@ -261,6 +277,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
           </div>
         )}
       </div>
+
 
       <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
         <Crosshair className="size-3.5" />
