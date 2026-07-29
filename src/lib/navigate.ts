@@ -1,14 +1,19 @@
 /**
  * Построение маршрута к точке заказа в Яндекс.Навигаторе.
  *
- * На телефоне сначала пробуем открыть приложение по deeplink
- * (yandexnavi://), а если его нет — уходим на веб-версию Яндекс.Карт.
+ * Точка старта — текущее местоположение (если пользователь разрешил доступ),
+ * иначе маршрут строится «от текущего места» силами самого навигатора.
  */
 
 export interface RouteTarget {
   lat?: number;
   lng?: number;
   location?: string;
+}
+
+export interface StartPoint {
+  lat: number;
+  lng: number;
 }
 
 export function canNavigate(o: RouteTarget) {
@@ -18,27 +23,44 @@ export function canNavigate(o: RouteTarget) {
   );
 }
 
-function webUrl(o: RouteTarget) {
+export function geolocationSupported() {
+  return typeof navigator !== "undefined" && "geolocation" in navigator;
+}
+
+/** Запрашивает текущие координаты. Вызывать только после подтверждения пользователя. */
+export function requestCurrentPosition(): Promise<StartPoint | null> {
+  if (!geolocationSupported()) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  });
+}
+
+function webUrl(o: RouteTarget, from?: StartPoint | null) {
+  const start = from ? `${from.lat},${from.lng}` : "";
   if (typeof o.lat === "number" && typeof o.lng === "number") {
-    // rtext=~lat,lon — маршрут «от текущего места» до точки, на авто
-    return `https://yandex.ru/maps/?rtext=~${o.lat},${o.lng}&rtt=auto`;
+    return `https://yandex.ru/maps/?rtext=${start}~${o.lat},${o.lng}&rtt=auto`;
   }
   return `https://yandex.ru/maps/?text=${encodeURIComponent(o.location || "")}&rtt=auto`;
 }
 
-function appUrl(o: RouteTarget) {
+function appUrl(o: RouteTarget, from?: StartPoint | null) {
   if (typeof o.lat === "number" && typeof o.lng === "number") {
-    return `yandexnavi://build_route_on_map?lat_to=${o.lat}&lon_to=${o.lng}`;
+    const fromPart = from ? `lat_from=${from.lat}&lon_from=${from.lng}&` : "";
+    return `yandexnavi://build_route_on_map?${fromPart}lat_to=${o.lat}&lon_to=${o.lng}`;
   }
   return `yandexnavi://map_search?text=${encodeURIComponent(o.location || "")}`;
 }
 
-export function openNavigator(o: RouteTarget) {
+export function openNavigator(o: RouteTarget, from?: StartPoint | null) {
   if (typeof window === "undefined" || !canNavigate(o)) return;
 
   const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
   if (!isMobile) {
-    window.open(webUrl(o), "_blank", "noopener");
+    window.open(webUrl(o, from), "_blank", "noopener");
     return;
   }
 
@@ -50,13 +72,13 @@ export function openNavigator(o: RouteTarget) {
   document.addEventListener("visibilitychange", onHide, { once: true });
   window.addEventListener("pagehide", onHide, { once: true });
 
-  window.location.href = appUrl(o);
+  window.location.href = appUrl(o, from);
 
   window.setTimeout(() => {
     document.removeEventListener("visibilitychange", onHide);
     window.removeEventListener("pagehide", onHide);
     if (!opened && !document.hidden) {
-      window.location.href = webUrl(o);
+      window.location.href = webUrl(o, from);
     }
   }, 1200);
 }
