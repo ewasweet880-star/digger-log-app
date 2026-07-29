@@ -147,6 +147,10 @@ export function useClients() {
   return useKey<Client[]>(KEY_CLIENTS, []);
 }
 
+export function useExpenses() {
+  return useKey<Expense[]>(KEY_EXPENSES, []);
+}
+
 export const WORK_TYPES = [
   "Копка траншеи",
   "Копка котлована",
