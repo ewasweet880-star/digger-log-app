@@ -23,7 +23,15 @@ import {
   Pencil,
   Navigation,
 } from "lucide-react";
-import { canNavigate, openNavigator } from "@/lib/navigate";
+import {
+  canNavigate,
+  openNavigator,
+  requestCurrentPosition,
+  type StartPoint,
+} from "@/lib/navigate";
+import { RouteStartDialog } from "./RouteStartDialog";
+
+const GEO_OK_KEY = "tracker.geoAllowed";
 
 const STATUS_META: Record<
   OrderStatus,
