@@ -54,8 +54,9 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               Яндекс.Карты
             </h3>
             <p className="text-sm text-muted-foreground">
-              Вставьте бесплатный ключ JavaScript API — тогда в заказе появится карта с
-              выбором точки и адресом.
+              Ключ уже подставлен по умолчанию. Если карта не грузится, вставьте свой
+              ключ «JavaScript API и HTTP Геокодер» — ключ MapKit SDK работает только в
+              нативном мобильном SDK.
             </p>
             <div className="flex items-center gap-2">
               <KeyRound className="size-4 text-muted-foreground shrink-0" />
@@ -65,7 +66,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                   setSettings((prev) => ({ ...prev, yandexApiKey: e.target.value }))
                 }
                 className="input"
-                placeholder="00000000-0000-0000-0000-000000000000"
+                placeholder={DEFAULT_YANDEX_KEY}
               />
             </div>
             <a
