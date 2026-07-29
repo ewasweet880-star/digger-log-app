@@ -176,6 +176,25 @@ function OrderCard({
 }) {
   const meta = STATUS_META[order.status];
   const Icon = meta.icon;
+  const [askGeo, setAskGeo] = useState(false);
+
+  async function route() {
+    const remembered =
+      typeof localStorage !== "undefined" && localStorage.getItem(GEO_OK_KEY) === "1";
+    if (!remembered) {
+      setAskGeo(true);
+      return;
+    }
+    const from = await requestCurrentPosition();
+    openNavigator(order, from);
+  }
+
+  function finish(from: StartPoint | null) {
+    setAskGeo(false);
+    if (from) localStorage.setItem(GEO_OK_KEY, "1");
+    openNavigator(order, from);
+  }
+
   return (
     <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
