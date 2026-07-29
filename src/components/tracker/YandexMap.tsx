@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSettings } from "@/lib/tracker-storage";
+import { useYandexKey } from "@/lib/tracker-storage";
 import { Crosshair, Loader2, Search } from "lucide-react";
 
 declare global {
@@ -38,8 +38,7 @@ interface Props {
 const DEFAULT_CENTER = [55.751244, 37.618423]; // Москва
 
 export function YandexMap({ lat, lng, address, onPick }: Props) {
-  const [settings] = useSettings();
-  const apiKey = settings.yandexApiKey?.trim();
+  const apiKey = useYandexKey();
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markRef = useRef<any>(null);
