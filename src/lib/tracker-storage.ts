@@ -140,10 +140,14 @@ export function useRates() {
 
 export interface Settings {
   yandexApiKey?: string;
+  yandexGeocoderKey?: string;
 }
 
-/** Ключ по умолчанию (MapKit SDK Key #5), можно заменить в «Настройках». */
+/** Ключ по умолчанию для JavaScript API карт, можно заменить в «Настройках». */
 export const DEFAULT_YANDEX_KEY = "29940867-f58f-46d9-8d8f-193828991a6d";
+
+/** Ключ по умолчанию для HTTP Геокодера (адреса по координатам и наоборот). */
+export const DEFAULT_GEOCODER_KEY = "22b11243-2abd-4ce0-9957-5e82e6ee5b47";
 
 export function useSettings() {
   return useKey<Settings>(KEY_SETTINGS, {});
@@ -153,6 +157,12 @@ export function useYandexKey() {
   const [settings] = useSettings();
   return settings.yandexApiKey?.trim() || DEFAULT_YANDEX_KEY;
 }
+
+export function useGeocoderKey() {
+  const [settings] = useSettings();
+  return settings.yandexGeocoderKey?.trim() || DEFAULT_GEOCODER_KEY;
+}
+
 
 export const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
