@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import {
   useOrders,
   formatMoney,
+  orderTotal,
+
   formatDate,
   isSameDay,
   type Order,
