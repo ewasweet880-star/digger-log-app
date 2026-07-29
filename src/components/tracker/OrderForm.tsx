@@ -224,7 +224,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </Field>
           </div>
 
-          <Field label="Сумма, ₽">
+          <Field label="Сумма за работу, ₽">
             <input
               type="number"
               min="0"
