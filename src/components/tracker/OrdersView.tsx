@@ -21,7 +21,9 @@ import {
   XCircle,
   Trash2,
   Pencil,
+  Navigation,
 } from "lucide-react";
+import { canNavigate, openNavigator } from "@/lib/navigate";
 
 const STATUS_META: Record<
   OrderStatus,
@@ -230,6 +232,14 @@ function OrderCard({
       )}
 
       <div className="flex gap-2 pt-1">
+        {canNavigate(order) && (
+          <button
+            onClick={() => openNavigator(order)}
+            className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
+          >
+            <Navigation className="size-4" /> Маршрут
+          </button>
+        )}
         <button
           onClick={onEdit}
           className="flex-1 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium inline-flex items-center justify-center gap-1"
@@ -244,6 +254,7 @@ function OrderCard({
           <Trash2 className="size-4" />
         </button>
       </div>
+
     </div>
   );
 }
