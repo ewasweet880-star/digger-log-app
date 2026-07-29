@@ -282,7 +282,11 @@ function OrderCard({
         </button>
       </div>
 
+      {askGeo && (
+        <RouteStartDialog onCancel={() => setAskGeo(false)} onReady={finish} />
+      )}
     </div>
+
   );
 }
 
