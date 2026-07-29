@@ -47,3 +47,27 @@ npx cap sync android
 
 ## Релизный APK (для установки без предупреждений)
 В Android Studio: **Build → Generate Signed Bundle / APK → APK**, создайте keystore и сохраните его — он нужен для всех будущих обновлений.
+
+## Геолокация
+
+Приложение определяет текущее местоположение (кнопка «Я здесь» на карте и точка
+старта маршрута). Установлен плагин `@capacitor/geolocation`, поэтому после
+обновления кода нужно один раз выполнить:
+
+```bash
+npm install
+npm run build
+npx cap sync android
+```
+
+В `android/app/src/main/AndroidManifest.xml` внутри `<manifest>` должны быть
+разрешения (Capacitor обычно добавляет их сам при sync):
+
+```xml
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+```
+
+При первом нажатии кнопки Android покажет системный запрос доступа — его нужно
+разрешить. Если случайно отказали, включить доступ можно в
+«Настройки → Приложения → Учёт работ → Разрешения → Геоданные».
