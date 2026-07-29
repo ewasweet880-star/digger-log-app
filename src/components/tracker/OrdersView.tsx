@@ -261,7 +261,7 @@ function OrderCard({
       <div className="flex gap-2 pt-1">
         {canNavigate(order) && (
           <button
-            onClick={() => openNavigator(order)}
+            onClick={route}
             className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
           >
             <Navigation className="size-4" /> Маршрут
