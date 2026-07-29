@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export type OrderStatus = "planned" | "in_progress" | "done" | "cancelled";
 
@@ -46,8 +46,15 @@ function read<T>(key: string, fallback: T): T {
 
 function write<T>(key: string, value: T) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-  window.dispatchEvent(new CustomEvent("excav:storage", { detail: { key } }));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.error("Не удалось сохранить данные", err);
+  }
+  // асинхронно, чтобы не диспатчить событие во время рендера React
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("excav:storage", { detail: { key } }));
+  }, 0);
 }
 
 export function uid() {
@@ -55,12 +62,26 @@ export function uid() {
 }
 
 function useKey<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => read(key, fallback));
+  const [value, setValue] = useState<T>(fallback);
+  const ref = useRef<T>(value);
+  const hydrated = useRef(false);
+
+  // читаем localStorage только после гидратации
+  useEffect(() => {
+    const initial = read(key, fallback);
+    hydrated.current = true;
+    ref.current = initial;
+    setValue(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { key: string } | undefined;
-      if (!detail || detail.key === key) setValue(read(key, fallback));
+      if (detail && detail.key !== key) return;
+      const next = read(key, fallback);
+      ref.current = next;
+      setValue(next);
     };
     window.addEventListener("excav:storage", handler);
     window.addEventListener("storage", handler);
@@ -68,22 +89,26 @@ function useKey<T>(key: string, fallback: T) {
       window.removeEventListener("excav:storage", handler);
       window.removeEventListener("storage", handler);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   const update = useCallback(
     (updater: T | ((prev: T) => T)) => {
-      setValue((prev) => {
-        const next =
-          typeof updater === "function" ? (updater as (p: T) => T)(prev) : updater;
-        write(key, next);
-        return next;
-      });
+      const base = hydrated.current ? ref.current : read(key, fallback);
+      const next =
+        typeof updater === "function" ? (updater as (p: T) => T)(base) : updater;
+      ref.current = next;
+      hydrated.current = true;
+      write(key, next);
+      setValue(next);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   );
 
   return [value, update] as const;
 }
+
 
 export function useOrders() {
   return useKey<Order[]>(KEY_ORDERS, []);
