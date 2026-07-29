@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useOrders, formatMoney, orderTotal } from "@/lib/tracker-storage";
-import { TrendingUp, Wallet, Clock, CheckCircle2 } from "lucide-react";
+import { useOrders, useExpenses, formatMoney, orderTotal } from "@/lib/tracker-storage";
+import { TrendingUp, Wallet, Clock, CheckCircle2, Fuel, Wrench } from "lucide-react";
 
 export function EarningsView() {
   const [orders] = useOrders();
