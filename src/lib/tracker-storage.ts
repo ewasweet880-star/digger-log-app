@@ -130,3 +130,44 @@ export function isSameDay(a: Date, b: Date) {
     a.getDate() === b.getDate()
   );
 }
+
+/** Ставка ₽ за час по виду работ */
+export type Rates = Record<string, number>;
+
+export function useRates() {
+  return useKey<Rates>(KEY_RATES, {});
+}
+
+export interface Settings {
+  yandexApiKey?: string;
+}
+
+export function useSettings() {
+  return useKey<Settings>(KEY_SETTINGS, {});
+}
+
+export const MONTHS_RU = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
+
+export const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+export function toISODate(d: Date) {
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Сетка месяца: 6 недель по 7 дней, начиная с понедельника */
+export function monthGrid(year: number, month: number) {
+  const first = new Date(year, month, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const start = new Date(year, month, 1 - offset);
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+}
