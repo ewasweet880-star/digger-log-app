@@ -4,6 +4,26 @@ import { TrendingUp, Wallet, Clock, CheckCircle2, Fuel, Wrench } from "lucide-re
 
 export function EarningsView() {
   const [orders] = useOrders();
+  const [expenses] = useExpenses();
+
+  const exp = useMemo(() => {
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    let month = 0,
+      total = 0,
+      fuelMonth = 0,
+      serviceMonth = 0;
+    for (const e of expenses) {
+      total += e.amount || 0;
+      if (e.date.startsWith(key)) {
+        month += e.amount || 0;
+        if (e.category === "fuel") fuelMonth += e.amount || 0;
+        else serviceMonth += e.amount || 0;
+      }
+    }
+    return { month, total, fuelMonth, serviceMonth };
+  }, [expenses]);
+
 
   const stats = useMemo(() => {
     const now = new Date();
