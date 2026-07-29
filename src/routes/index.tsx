@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ClipboardList, Users, Wallet } from "lucide-react";
+import { CalendarDays, ClipboardList, Settings, Users, Wallet } from "lucide-react";
 import { OrdersView } from "@/components/tracker/OrdersView";
+import { CalendarView } from "@/components/tracker/CalendarView";
 import { ClientsView } from "@/components/tracker/ClientsView";
 import { EarningsView } from "@/components/tracker/EarningsView";
+import { SettingsView } from "@/components/tracker/SettingsView";
 
 export const Route = createFileRoute("/")({
   head: () => ({
