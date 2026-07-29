@@ -142,5 +142,8 @@ function TabButton({
 }
 
 function tabLabel(t: Tab) {
-  return t === "orders" ? "Заказы и планирование" : t === "clients" ? "База клиентов" : "Учёт заработка";
+  if (t === "orders") return "Заказы и планирование";
+  if (t === "calendar") return "Календарь загрузки";
+  if (t === "clients") return "База клиентов";
+  return "Учёт заработка";
 }
