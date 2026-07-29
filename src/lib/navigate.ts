@@ -5,6 +5,8 @@
  * иначе маршрут строится «от текущего места» силами самого навигатора.
  */
 
+import { getCurrentPosition, geolocationSupported } from "./geo";
+
 export interface RouteTarget {
   lat?: number;
   lng?: number;
@@ -23,21 +25,14 @@ export function canNavigate(o: RouteTarget) {
   );
 }
 
-export function geolocationSupported() {
-  return typeof navigator !== "undefined" && "geolocation" in navigator;
-}
+export { geolocationSupported };
 
 /** Запрашивает текущие координаты. Вызывать только после подтверждения пользователя. */
-export function requestCurrentPosition(): Promise<StartPoint | null> {
-  if (!geolocationSupported()) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
-  });
+export async function requestCurrentPosition(): Promise<StartPoint | null> {
+  const { point } = await getCurrentPosition();
+  return point ? { lat: point.lat, lng: point.lng } : null;
 }
+
 
 function webUrl(o: RouteTarget, from?: StartPoint | null) {
   const start = from ? `${from.lat},${from.lng}` : "";

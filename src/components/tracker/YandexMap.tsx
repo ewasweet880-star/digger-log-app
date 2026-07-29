@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useGeocoderKey, useYandexKey } from "@/lib/tracker-storage";
 import { forwardGeocode, reverseGeocode } from "@/lib/yandex-geocode";
-import { Crosshair, Loader2, Search } from "lucide-react";
+import { Crosshair, Loader2, LocateFixed, Search } from "lucide-react";
+import { GEO_ERROR_TEXT, geolocationSupported, getCurrentPosition } from "@/lib/geo";
 
 
 declare global {
@@ -55,6 +56,8 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!apiKey) {
@@ -128,11 +131,54 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
     };
   }, []);
 
+  /** Ставит/двигает метку и сообщает координаты наверх. */
+  function putMarker(coords: number[], zoom = 16) {
+    const ymaps = ymapsRef.current;
+    if (!ymaps || !mapRef.current) return;
+    mapRef.current.setCenter(coords, zoom);
+    if (!markRef.current) {
+      markRef.current = new ymaps.Placemark(
+        coords,
+        {},
+        { draggable: true, preset: "islands#orangeDotIcon" },
+      );
+      markRef.current.events.add("dragend", () => {
+        const c = markRef.current.geometry.getCoordinates();
+        onPickRef.current(c[0], c[1]);
+        reverseGeocode(geoKeyRef.current, c[0], c[1])
+          .then((rr) => onPickRef.current(c[0], c[1], rr?.address || undefined))
+          .catch(() => undefined);
+      });
+      mapRef.current.geoObjects.add(markRef.current);
+    } else {
+      markRef.current.geometry.setCoordinates(coords);
+    }
+  }
+
+  /** Определяет текущее местоположение и ставит метку туда. */
+  async function locate() {
+    setGeoError(null);
+    setLocating(true);
+    const { point, error: geoErr } = await getCurrentPosition();
+    setLocating(false);
+    if (!point) {
+      setGeoError(GEO_ERROR_TEXT[geoErr ?? "unavailable"]);
+      return;
+    }
+    putMarker([point.lat, point.lng], 17);
+    onPickRef.current(point.lat, point.lng);
+    const r = await reverseGeocode(geoKeyRef.current, point.lat, point.lng).catch(
+      () => null,
+    );
+    onPickRef.current(point.lat, point.lng, r?.address || undefined);
+  }
+
   function search(e: React.FormEvent) {
     e.preventDefault();
     const ymaps = ymapsRef.current;
     const text = query.trim() || address.trim();
     if (!ymaps || !mapRef.current || !text) return;
+
     forwardGeocode(geoKeyRef.current, text)
       .then((r) => {
         if (!r || Number.isNaN(r.lat)) return;
@@ -202,6 +248,22 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={locate}
+        disabled={locating || !geolocationSupported()}
+        className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {locating ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <LocateFixed className="size-4" />
+        )}
+        {locating ? "Определяю..." : "Я здесь — моё местоположение"}
+      </button>
+
+      {geoError && <p className="text-xs text-destructive">{geoError}</p>}
+
       <div className="relative h-56 rounded-xl overflow-hidden border border-border">
         <div ref={boxRef} className="absolute inset-0" />
         {loading && (
@@ -215,6 +277,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
           </div>
         )}
       </div>
+
 
       <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
         <Crosshair className="size-3.5" />
