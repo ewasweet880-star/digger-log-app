@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useYandexKey } from "@/lib/tracker-storage";
+import { useGeocoderKey, useYandexKey } from "@/lib/tracker-storage";
+import { forwardGeocode, reverseGeocode } from "@/lib/yandex-geocode";
 import { Crosshair, Loader2, Search } from "lucide-react";
+
 
 declare global {
   interface Window {
@@ -39,12 +41,16 @@ const DEFAULT_CENTER = [55.751244, 37.618423]; // Москва
 
 export function YandexMap({ lat, lng, address, onPick }: Props) {
   const apiKey = useYandexKey();
+  const geocoderKey = useGeocoderKey();
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markRef = useRef<any>(null);
   const ymapsRef = useRef<any>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const geoKeyRef = useRef(geocoderKey);
+  geoKeyRef.current = geocoderKey;
+
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,18 +95,13 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
 
         const resolveAddress = (coords: number[]) => {
           onPickRef.current(coords[0], coords[1]);
-          ymaps
-            .geocode(coords, { results: 1 })
-            .then((res: any) => {
-              const first = res.geoObjects.get(0);
-              onPickRef.current(
-                coords[0],
-                coords[1],
-                first ? first.getAddressLine() : undefined,
-              );
+          reverseGeocode(geoKeyRef.current, coords[0], coords[1])
+            .then((r) => {
+              onPickRef.current(coords[0], coords[1], r?.address || undefined);
             })
             .catch(() => undefined);
         };
+
 
         map.events.add("click", (e: any) => place(e.get("coords")));
         if (lat != null && lng != null) place([lat, lng], false);
@@ -132,23 +133,32 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
     const ymaps = ymapsRef.current;
     const text = query.trim() || address.trim();
     if (!ymaps || !mapRef.current || !text) return;
-    ymaps.geocode(text, { results: 1 }).then((res: any) => {
-      const first = res.geoObjects.get(0);
-      if (!first) return;
-      const coords = first.geometry.getCoordinates();
-      mapRef.current.setCenter(coords, 16);
-      if (!markRef.current) {
-        markRef.current = new ymaps.Placemark(
-          coords,
-          {},
-          { draggable: true, preset: "islands#orangeDotIcon" },
-        );
-        mapRef.current.geoObjects.add(markRef.current);
-      } else {
-        markRef.current.geometry.setCoordinates(coords);
-      }
-      onPickRef.current(coords[0], coords[1], first.getAddressLine());
-    });
+    forwardGeocode(geoKeyRef.current, text)
+      .then((r) => {
+        if (!r || Number.isNaN(r.lat)) return;
+        const coords = [r.lat, r.lng];
+        mapRef.current.setCenter(coords, 16);
+        if (!markRef.current) {
+          markRef.current = new ymaps.Placemark(
+            coords,
+            {},
+            { draggable: true, preset: "islands#orangeDotIcon" },
+          );
+          markRef.current.events.add("dragend", () => {
+            const c = markRef.current.geometry.getCoordinates();
+            onPickRef.current(c[0], c[1]);
+            reverseGeocode(geoKeyRef.current, c[0], c[1])
+              .then((rr) => onPickRef.current(c[0], c[1], rr?.address || undefined))
+              .catch(() => undefined);
+          });
+          mapRef.current.geoObjects.add(markRef.current);
+        } else {
+          markRef.current.geometry.setCoordinates(coords);
+        }
+        onPickRef.current(r.lat, r.lng, r.address || undefined);
+      })
+      .catch(() => setError("Не удалось найти адрес"));
+
   }
 
   if (!apiKey) {
