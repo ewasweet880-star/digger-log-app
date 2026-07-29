@@ -107,8 +107,34 @@ function useKey<T>(key: string, fallback: T) {
     hydrated.current = true;
     ref.current = initial;
     setValue(initial);
+
+    // В APK localStorage может быть очищен системой — восстанавливаем из
+    // нативной памяти телефона, если там есть данные.
+    if (!isNativeApp()) return;
+    let cancelled = false;
+    const hasLocal = Boolean(window.localStorage.getItem(key));
+    void nativeGet(key).then((raw) => {
+      if (cancelled || !raw) {
+        // ничего в нативном хранилище — переносим туда текущие данные
+        if (!cancelled && hasLocal) nativeSet(key, JSON.stringify(initial));
+        return;
+      }
+      if (hasLocal) return; // локальные данные актуальны
+      try {
+        const restored = JSON.parse(raw) as T;
+        ref.current = restored;
+        setValue(restored);
+        window.localStorage.setItem(key, raw);
+      } catch {
+        /* ignore */
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
 
   useEffect(() => {
     const handler = (e: Event) => {
