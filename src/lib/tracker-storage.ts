@@ -75,16 +75,20 @@ function read<T>(key: string, fallback: T): T {
 
 function write<T>(key: string, value: T) {
   if (typeof window === "undefined") return;
+  const raw = JSON.stringify(value);
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(key, raw);
   } catch (err) {
     console.error("Не удалось сохранить данные", err);
   }
+  // дублируем в нативное хранилище телефона (Android APK)
+  nativeSet(key, raw);
   // асинхронно, чтобы не диспатчить событие во время рендера React
   setTimeout(() => {
     window.dispatchEvent(new CustomEvent("excav:storage", { detail: { key } }));
   }, 0);
 }
+
 
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
