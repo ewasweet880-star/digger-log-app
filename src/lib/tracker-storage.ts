@@ -30,6 +30,8 @@ export interface Client {
 
 const KEY_ORDERS = "excav.orders.v1";
 const KEY_CLIENTS = "excav.clients.v1";
+const KEY_RATES = "excav.rates.v1";
+const KEY_SETTINGS = "excav.settings.v1";
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
