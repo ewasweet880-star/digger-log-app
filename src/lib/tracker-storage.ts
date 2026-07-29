@@ -31,7 +31,33 @@ export interface Client {
   createdAt: string;
 }
 
+export type ExpenseCategory = "fuel" | "service" | "parts" | "other";
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  amount: number; // ₽
+  date: string; // ISO yyyy-mm-dd
+  /** Литры топлива (для категории «Топливо») */
+  liters?: number;
+  note?: string;
+  orderId?: string;
+  createdAt: string;
+}
+
+export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: "fuel", label: "Топливо" },
+  { value: "service", label: "Тех. обслуживание" },
+  { value: "parts", label: "Запчасти" },
+  { value: "other", label: "Прочее" },
+];
+
+export function expenseLabel(c: ExpenseCategory) {
+  return EXPENSE_CATEGORIES.find((x) => x.value === c)?.label ?? "Прочее";
+}
+
 const KEY_ORDERS = "excav.orders.v1";
+const KEY_EXPENSES = "excav.expenses.v1";
 const KEY_CLIENTS = "excav.clients.v1";
 const KEY_RATES = "excav.rates.v1";
 const KEY_SETTINGS = "excav.settings.v1";
