@@ -42,6 +42,8 @@ npm install
 npm run build
 npx cap sync android
 ```
+`npx cap sync android` обязателен после добавления плагина `@capacitor/preferences` — иначе заказы не сохранятся в памяти телефона.
+
 
 ## Релизный APK (для установки без предупреждений)
 В Android Studio: **Build → Generate Signed Bundle / APK → APK**, создайте keystore и сохраните его — он нужен для всех будущих обновлений.
