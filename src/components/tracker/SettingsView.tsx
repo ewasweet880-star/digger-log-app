@@ -1,10 +1,12 @@
 import {
+  DEFAULT_GEOCODER_KEY,
   DEFAULT_YANDEX_KEY,
   useRates,
   useSettings,
   WORK_TYPES,
 } from "@/lib/tracker-storage";
-import { ExternalLink, KeyRound, X } from "lucide-react";
+import { ExternalLink, KeyRound, MapPin, X } from "lucide-react";
+
 
 export function SettingsView({ onClose }: { onClose: () => void }) {
   const [rates, setRates] = useRates();
