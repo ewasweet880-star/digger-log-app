@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   useOrders,
   formatMoney,
+  orderTotal,
   MONTHS_RU,
   WEEKDAYS_RU,
   monthGrid,
@@ -41,7 +42,7 @@ export function CalendarView() {
             new Date(`${o.date}T00:00:00`).getMonth() === view.getMonth() &&
             new Date(`${o.date}T00:00:00`).getFullYear() === view.getFullYear(),
         )
-        .reduce((s, o) => s + (o.price || 0), 0),
+        .reduce((s, o) => s + orderTotal(o), 0),
     [orders, view],
   );
 
@@ -161,7 +162,7 @@ export function CalendarView() {
                 </div>
               </div>
               <div className="font-display text-primary shrink-0">
-                {formatMoney(o.price)}
+                {formatMoney(orderTotal(o))}
               </div>
             </button>
           ))

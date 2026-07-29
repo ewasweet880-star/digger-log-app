@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import {
   useOrders,
   formatMoney,
+  orderTotal,
+
   formatDate,
   isSameDay,
   type Order,
@@ -181,7 +183,7 @@ function OrderCard({
         </div>
         <div className="text-right shrink-0">
           <div className="font-display text-xl text-primary leading-none">
-            {formatMoney(order.price)}
+            {formatMoney(orderTotal(order))}
           </div>
           {order.paid ? (
             <span className="text-[10px] font-bold uppercase text-[color:var(--success)] mt-1 inline-block">

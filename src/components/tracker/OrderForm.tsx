@@ -4,6 +4,8 @@ import {
   useOrders,
   useRates,
   uid,
+  formatMoney,
+
   WORK_TYPES,
   type Order,
   type OrderStatus,
@@ -37,6 +39,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   );
   const [hours, setHours] = useState(editing?.hours?.toString() ?? "");
   const [price, setPrice] = useState(editing?.price?.toString() ?? "");
+  const [delivery, setDelivery] = useState(editing?.delivery?.toString() ?? "");
+
   const [priceTouched, setPriceTouched] = useState(Boolean(editing?.price));
   const [status, setStatus] = useState<OrderStatus>(editing?.status ?? "planned");
   const [paid, setPaid] = useState(editing?.paid ?? false);
@@ -95,7 +99,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       date,
       hours: hours ? Number(hours) : undefined,
       price: price ? Number(price) : 0,
+      delivery: delivery ? Number(delivery) : undefined,
       paid,
+
       status,
       notes: notes || undefined,
       createdAt: editing?.createdAt ?? new Date().toISOString(),
@@ -220,7 +226,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </Field>
           </div>
 
-          <Field label="Сумма, ₽">
+          <Field label="Сумма за работу, ₽">
             <input
               type="number"
               min="0"
@@ -251,6 +257,27 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
               )}
             </p>
           ) : null}
+
+          <Field label="Доставка техники, ₽">
+            <input
+              type="number"
+              min="0"
+              value={delivery}
+              onChange={(e) => setDelivery(e.target.value)}
+              className="input"
+              placeholder="0"
+            />
+          </Field>
+
+          <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2.5">
+            <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+              Итого
+            </span>
+            <span className="font-display text-xl text-primary">
+              {formatMoney((Number(price) || 0) + (Number(delivery) || 0))}
+            </span>
+          </div>
+
 
           <Field label="Статус">
             <div className="grid grid-cols-2 gap-2">

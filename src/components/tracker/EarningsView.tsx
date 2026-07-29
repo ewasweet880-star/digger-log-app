@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useOrders, formatMoney } from "@/lib/tracker-storage";
+import { useOrders, formatMoney, orderTotal } from "@/lib/tracker-storage";
 import { TrendingUp, Wallet, Clock, CheckCircle2 } from "lucide-react";
 
 export function EarningsView() {
@@ -23,16 +23,16 @@ export function EarningsView() {
     for (const o of orders) {
       const d = new Date(o.date);
       if (o.status !== "cancelled") {
-        total += o.price || 0;
+        total += orderTotal(o);
         if (d >= startMonth) {
-          month += o.price || 0;
+          month += orderTotal(o);
           hoursMonth += o.hours || 0;
         }
-        if (d >= startWeek) week += o.price || 0;
+        if (d >= startWeek) week += orderTotal(o);
         if (o.status === "done") doneCount++;
       }
-      if (!o.paid && o.status !== "cancelled") unpaid += o.price || 0;
-      if (o.status === "planned") planned += o.price || 0;
+      if (!o.paid && o.status !== "cancelled") unpaid += orderTotal(o);
+      if (o.status === "planned") planned += orderTotal(o);
     }
     return { month, week, total, unpaid, planned, hoursMonth, doneCount };
   }, [orders]);
@@ -43,7 +43,7 @@ export function EarningsView() {
       if (o.status === "cancelled") continue;
       const d = new Date(o.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      map.set(key, (map.get(key) ?? 0) + (o.price || 0));
+      map.set(key, (map.get(key) ?? 0) + (orderTotal(o)));
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
   }, [orders]);

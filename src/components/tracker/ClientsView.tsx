@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useClients, useOrders, formatMoney, uid } from "@/lib/tracker-storage";
+import { useClients, useOrders, formatMoney, orderTotal, uid } from "@/lib/tracker-storage";
 import { Phone, Trash2, UserPlus, X } from "lucide-react";
 
 export function ClientsView() {
@@ -13,7 +13,7 @@ export function ClientsView() {
       const key = o.clientId ?? o.clientName;
       const cur = map.get(key) ?? { count: 0, total: 0 };
       cur.count += 1;
-      cur.total += o.price || 0;
+      cur.total += orderTotal(o);
       map.set(key, cur);
     }
     return map;

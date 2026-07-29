@@ -11,8 +11,11 @@ export interface Order {
   location: string;
   date: string; // ISO date
   hours?: number;
-  price: number; // total rubles
+  price: number; // сумма за работу, ₽
+  /** Стоимость доставки/подачи техники, ₽ */
+  delivery?: number;
   paid: boolean;
+
   status: OrderStatus;
   notes?: string;
   createdAt: string;
@@ -131,7 +134,13 @@ export const WORK_TYPES = [
   "Другое",
 ];
 
+/** Итог по заказу: работа + доставка техники */
+export function orderTotal(o: { price?: number; delivery?: number }) {
+  return (o.price || 0) + (o.delivery || 0);
+}
+
 export function formatMoney(n: number) {
+
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency: "RUB",
