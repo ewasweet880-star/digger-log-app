@@ -11,8 +11,11 @@ export interface Order {
   location: string;
   date: string; // ISO date
   hours?: number;
-  price: number; // total rubles
+  price: number; // сумма за работу, ₽
+  /** Стоимость доставки/подачи техники, ₽ */
+  delivery?: number;
   paid: boolean;
+
   status: OrderStatus;
   notes?: string;
   createdAt: string;
