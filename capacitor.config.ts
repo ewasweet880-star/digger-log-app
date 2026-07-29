@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     // Приложение на TanStack Start рендерится на сервере, поэтому APK
     // загружает живую версию сайта. Замените на ваш published-домен,
     // когда опубликуете проект.
-    url: "https://id-preview--81bd95a7-d973-484b-bf89-af068ce1d2cb.lovable.app?forceHideBadge=true",
+    url: "https://digger-log-app.lovable.app?forceHideBadge=true",
     cleartext: true,
   },
   android: {
