@@ -2,34 +2,57 @@ import { useState } from "react";
 import {
   useClients,
   useOrders,
+  useRates,
   uid,
   WORK_TYPES,
   type Order,
   type OrderStatus,
 } from "@/lib/tracker-storage";
-import { X } from "lucide-react";
+import { DatePicker } from "./DatePicker";
+import { YandexMap } from "./YandexMap";
+import { Map as MapIcon, X } from "lucide-react";
 
 interface Props {
   onClose: () => void;
   editing?: Order;
+  defaultDate?: string;
 }
 
-export function OrderForm({ onClose, editing }: Props) {
-  const [, setOrders] = useOrders();
+export function OrderForm({ onClose, editing, defaultDate }: Props) {
+  const [orders, setOrders] = useOrders();
   const [clients, setClients] = useClients();
+  const [rates] = useRates();
 
   const [clientName, setClientName] = useState(editing?.clientName ?? "");
   const [clientPhone, setClientPhone] = useState(editing?.clientPhone ?? "");
   const [workType, setWorkType] = useState(editing?.workType ?? WORK_TYPES[0]);
   const [location, setLocation] = useState(editing?.location ?? "");
+  const [coords, setCoords] = useState<{ lat?: number; lng?: number }>({
+    lat: editing?.lat,
+    lng: editing?.lng,
+  });
+  const [showMap, setShowMap] = useState(editing?.lat != null);
   const [date, setDate] = useState(
-    editing?.date ?? new Date().toISOString().slice(0, 10),
+    editing?.date ?? defaultDate ?? new Date().toISOString().slice(0, 10),
   );
   const [hours, setHours] = useState(editing?.hours?.toString() ?? "");
   const [price, setPrice] = useState(editing?.price?.toString() ?? "");
+  const [priceTouched, setPriceTouched] = useState(Boolean(editing?.price));
   const [status, setStatus] = useState<OrderStatus>(editing?.status ?? "planned");
   const [paid, setPaid] = useState(editing?.paid ?? false);
   const [notes, setNotes] = useState(editing?.notes ?? "");
+
+  const rate = rates[workType];
+  const busyDates = orders
+    .filter((o) => o.status !== "cancelled" && o.id !== editing?.id)
+    .map((o) => o.date);
+
+  function autoPrice(nextHours: string, nextType: string) {
+    const r = rates[nextType];
+    if (priceTouched || !r) return;
+    const h = Number(nextHours);
+    if (h > 0) setPrice(String(Math.round(h * r)));
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +90,8 @@ export function OrderForm({ onClose, editing }: Props) {
       clientPhone: clientPhone || undefined,
       workType,
       location: location.trim(),
+      lat: coords.lat,
+      lng: coords.lng,
       date,
       hours: hours ? Number(hours) : undefined,
       price: price ? Number(price) : 0,
@@ -131,7 +156,10 @@ export function OrderForm({ onClose, editing }: Props) {
           <Field label="Вид работ">
             <select
               value={workType}
-              onChange={(e) => setWorkType(e.target.value)}
+              onChange={(e) => {
+                setWorkType(e.target.value);
+                autoPrice(hours, e.target.value);
+              }}
               className="input"
             >
               {WORK_TYPES.map((w) => (
@@ -151,14 +179,30 @@ export function OrderForm({ onClose, editing }: Props) {
             />
           </Field>
 
+          <button
+            type="button"
+            onClick={() => setShowMap((s) => !s)}
+            className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+          >
+            <MapIcon className="size-4" />
+            {showMap ? "Скрыть карту" : "Отметить на карте"}
+          </button>
+
+          {showMap && (
+            <YandexMap
+              lat={coords.lat}
+              lng={coords.lng}
+              address={location}
+              onPick={(lat, lng, addr) => {
+                setCoords({ lat, lng });
+                if (addr) setLocation(addr);
+              }}
+            />
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Дата">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="input"
-              />
+              <DatePicker value={date} onChange={setDate} busy={busyDates} />
             </Field>
             <Field label="Часы">
               <input
@@ -166,7 +210,10 @@ export function OrderForm({ onClose, editing }: Props) {
                 min="0"
                 step="0.5"
                 value={hours}
-                onChange={(e) => setHours(e.target.value)}
+                onChange={(e) => {
+                  setHours(e.target.value);
+                  autoPrice(e.target.value, workType);
+                }}
                 className="input"
                 placeholder="0"
               />
@@ -178,11 +225,32 @@ export function OrderForm({ onClose, editing }: Props) {
               type="number"
               min="0"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => {
+                setPrice(e.target.value);
+                setPriceTouched(true);
+              }}
               className="input text-lg font-bold"
               placeholder="0"
             />
           </Field>
+          {rate ? (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Ставка {rate.toLocaleString("ru-RU")} ₽/ч — сумма считается автоматически.
+              {priceTouched && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPriceTouched(false);
+                    const h = Number(hours);
+                    if (h > 0) setPrice(String(Math.round(h * rate)));
+                  }}
+                  className="ml-1 text-primary font-semibold"
+                >
+                  Пересчитать
+                </button>
+              )}
+            </p>
+          ) : null}
 
           <Field label="Статус">
             <div className="grid grid-cols-2 gap-2">
