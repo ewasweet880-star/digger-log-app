@@ -1,10 +1,7 @@
 import { useState } from "react";
 import { Navigation, MapPin, Loader2 } from "lucide-react";
-import {
-  requestCurrentPosition,
-  geolocationSupported,
-  type StartPoint,
-} from "@/lib/navigate";
+import { GEO_ERROR_TEXT, geolocationSupported, getCurrentPosition } from "@/lib/geo";
+import type { StartPoint } from "@/lib/navigate";
 
 interface Props {
   onCancel: () => void;
@@ -19,14 +16,15 @@ export function RouteStartDialog({ onCancel, onReady }: Props) {
   async function allow() {
     setLoading(true);
     setError(null);
-    const pos = await requestCurrentPosition();
+    const { point, error: geoErr } = await getCurrentPosition();
     setLoading(false);
-    if (!pos) {
-      setError("Не удалось получить местоположение. Проверьте доступ к геолокации в настройках телефона.");
+    if (!point) {
+      setError(GEO_ERROR_TEXT[geoErr ?? "unavailable"]);
       return;
     }
-    onReady(pos);
+    onReady({ lat: point.lat, lng: point.lng });
   }
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
