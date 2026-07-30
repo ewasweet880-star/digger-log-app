@@ -5,6 +5,7 @@ import {
   useRates,
   useSettings,
   useShiftRates,
+  WORK_TYPES,
 } from "@/lib/tracker-storage";
 import {
   checkLocationPermission,
