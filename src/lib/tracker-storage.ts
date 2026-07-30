@@ -234,9 +234,18 @@ export function useRates() {
   return useKey<Rates>(KEY_RATES, {});
 }
 
+/** Ставка ₽ за смену по виду работ */
+export function useShiftRates() {
+  return useKey<Rates>(KEY_SHIFT_RATES, {});
+}
+
 export interface Settings {
   yandexApiKey?: string;
   yandexGeocoderKey?: string;
+  /** Сколько часов в одной смене */
+  shiftHours?: number;
+  /** Цена подачи (транспортировки) техники по умолчанию, ₽ */
+  deliveryPrice?: number;
 }
 
 /** Ключ по умолчанию для JavaScript API карт, можно заменить в «Настройках». */
