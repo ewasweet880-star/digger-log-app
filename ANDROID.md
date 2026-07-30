@@ -53,20 +53,23 @@ npx cap sync android
 Приложение определяет текущее местоположение (кнопка «Я здесь» на карте и точка
 старта маршрута). Используется плагин `@capacitor/geolocation`.
 
-### Если в настройках приложения нет пункта «Геоданные»
+### Если в настройках телефона написано «Разрешений не требуется»
 
-Значит папка `android/` была создана до установки плагина, и разрешения не попали
-в манифест. Выполните:
+Это значит, что установленный APK собран БЕЗ разрешений на геолокацию — выдать
+доступ в настройках Android невозможно, пока не пересоберёте приложение.
+
+Порядок (выполнять целиком, ничего не пропуская):
 
 ```bash
 git pull
 npm install
 npm run build
 npx cap sync android
+npm run android:fix     # допишет разрешения в AndroidManifest.xml, если их нет
 ```
 
-Затем откройте `android/app/src/main/AndroidManifest.xml` и убедитесь, что внутри
-`<manifest>` (до `<application>`) есть:
+Проверьте `android/app/src/main/AndroidManifest.xml` — внутри `<manifest>`,
+до `<application>`, должны быть строки:
 
 ```xml
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -74,9 +77,13 @@ npx cap sync android
 <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 ```
 
-Если строк нет — добавьте вручную и пересоберите APK
-(**Build → Build Bundle(s)/APK(s) → Build APK(s)**), затем переустановите приложение
-на телефоне (лучше удалить старое).
+Затем:
+1. В Android Studio **Build → Clean Project**, потом **Build → Build APK(s)**.
+2. На телефоне **удалите старое приложение** (обновление поверх часто оставляет
+   старый манифест) и установите новый APK.
+3. Откройте «Настройки → Геолокация → Запросить доступ» — появится системный
+   диалог, а пункт «Разрешения → Геоданные» появится в настройках телефона.
+
 
 ### Как выдать доступ
 

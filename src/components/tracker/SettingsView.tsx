@@ -13,6 +13,7 @@ import {
   geolocationSupported,
   getCurrentPosition,
   isNativeApp,
+  nativeGeolocationAvailable,
   type PermissionState,
 } from "@/lib/geo";
 import {
@@ -35,10 +36,14 @@ function GeolocationSection() {
   const [state, setState] = useState<PermissionState>("unknown");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [nativePlugin, setNativePlugin] = useState<boolean | null>(null);
 
   useEffect(() => {
     void checkLocationPermission().then(setState);
+    void nativeGeolocationAvailable().then(setNativePlugin);
   }, []);
+
+  const brokenBuild = isNativeApp() && nativePlugin === false;
 
   async function request() {
     setBusy(true);
@@ -51,7 +56,7 @@ function GeolocationSection() {
       setNote(`Местоположение получено: ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`);
     } else if (error === "denied") {
       setNote(
-        "Android отказал в доступе. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ.",
+        "Android отказал в доступе. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ. Если такого пункта нет — APK собран без разрешения, нужна пересборка (см. ниже).",
       );
     } else {
       setNote("Не удалось получить координаты. Включите GPS и попробуйте ещё раз.");
@@ -84,6 +89,30 @@ function GeolocationSection() {
         {busy ? "Проверяю..." : "Запросить доступ к геолокации"}
       </button>
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
+
+      {brokenBuild && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 space-y-1">
+          <p className="text-sm font-semibold text-destructive">
+            APK собран без модуля геолокации
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Поэтому в настройках телефона написано «Разрешений не требуется» и выдать
+            доступ невозможно. Нужно пересобрать приложение на компьютере:
+          </p>
+          <pre className="text-[11px] leading-relaxed overflow-x-auto bg-background/60 rounded-lg p-2">
+{`git pull
+npm install
+npm run build
+npx cap sync android
+npm run android:fix`}
+          </pre>
+          <p className="text-xs text-muted-foreground">
+            Затем в Android Studio: Build → Clean Project → Build APK(s), удалить старое
+            приложение с телефона и установить новый APK.
+          </p>
+        </div>
+      )}
+
       {!isNativeApp() && (
         <p className="text-xs text-muted-foreground">
           В браузере разрешение выдаётся для сайта, в приложении — в настройках Android.
