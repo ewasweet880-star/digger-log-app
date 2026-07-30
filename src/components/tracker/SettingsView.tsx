@@ -186,6 +186,10 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             </a>
           </section>
 
+          <GeolocationSection />
+
+
+
         </div>
 
         <div className="sticky bottom-0 p-4 bg-card border-t border-border">
