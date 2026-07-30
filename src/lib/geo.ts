@@ -125,7 +125,9 @@ export async function checkLocationPermission(): Promise<PermissionState> {
   const plugin = await getPlugin();
   if (plugin) {
     try {
-      return normalize(await plugin.checkPermissions());
+      return normalize(
+        await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS),
+      );
     } catch {
       return "unknown";
     }

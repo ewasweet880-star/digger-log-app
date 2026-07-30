@@ -9,7 +9,6 @@ import {
 } from "@/lib/tracker-storage";
 import {
   checkLocationPermission,
-  ensureLocationPermission,
   geolocationSupported,
   getCurrentPosition,
   isNativeApp,
