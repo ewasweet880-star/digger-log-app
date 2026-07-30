@@ -26,6 +26,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [orders, setOrders] = useOrders();
   const [clients, setClients] = useClients();
   const [rates] = useRates();
+  const [shiftRates] = useShiftRates();
+  const [settings] = useSettings();
 
   const [clientName, setClientName] = useState(editing?.clientName ?? "");
   const [clientPhone, setClientPhone] = useState(editing?.clientPhone ?? "");
