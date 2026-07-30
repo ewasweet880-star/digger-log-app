@@ -259,9 +259,13 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
               placeholder="0"
             />
           </Field>
-          {rate ? (
+          {rate || shiftRate ? (
             <p className="-mt-2 text-xs text-muted-foreground">
-              Ставка {rate.toLocaleString("ru-RU")} ₽/ч — сумма считается автоматически.
+              {rate ? `Ставка ${rate.toLocaleString("ru-RU")} ₽/ч. ` : ""}
+              {shiftRate
+                ? `Смена (${shiftHours} ч) — ${shiftRate.toLocaleString("ru-RU")} ₽. `
+                : ""}
+              Сумма считается автоматически.
               {priceTouched && (
                 <button
                   type="button"
