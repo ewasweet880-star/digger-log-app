@@ -48,18 +48,26 @@ function GeolocationSection() {
   async function request() {
     setBusy(true);
     setNote(null);
-    await ensureLocationPermission();
-    const { point, error } = await getCurrentPosition();
-    setState(await checkLocationPermission());
-    setBusy(false);
-    if (point) {
-      setNote(`Местоположение получено: ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`);
-    } else if (error === "denied") {
-      setNote(
-        "Android отказал в доступе. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ. Если такого пункта нет — APK собран без разрешения, нужна пересборка (см. ниже).",
-      );
-    } else {
-      setNote("Не удалось получить координаты. Включите GPS и попробуйте ещё раз.");
+    try {
+      const { point, error } = await getCurrentPosition();
+      setState(await checkLocationPermission());
+      if (point) {
+        setNote(
+          `Местоположение получено: ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`,
+        );
+      } else if (error === "denied") {
+        setNote(
+          "Android отказал в доступе. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ. Если такого пункта нет — APK собран без разрешения, нужна пересборка (см. ниже).",
+        );
+      } else if (error === "timeout") {
+        setNote(
+          "GPS не ответил за 20 секунд. Включите геолокацию телефона, выйдите на открытое место и повторите.",
+        );
+      } else {
+        setNote("Не удалось получить координаты. Включите GPS и попробуйте ещё раз.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 

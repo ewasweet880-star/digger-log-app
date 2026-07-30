@@ -27,8 +27,34 @@ export const GEO_ERROR_TEXT: Record<GeoError, string> = {
     "Доступ к геолокации запрещён. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ.",
   unavailable:
     "Не удалось определить местоположение. Включите GPS и попробуйте ещё раз.",
-  timeout: "Определение местоположения заняло слишком много времени.",
+  timeout:
+    "Не удалось получить координаты за 20 секунд. Проверьте, что GPS включён, выйдите на открытое место и попробуйте ещё раз.",
 };
+
+const PERMISSION_TIMEOUT_MS = 10_000;
+const POSITION_TIMEOUT_MS = 20_000;
+
+class GeoTimeoutError extends Error {}
+
+/** Android WebView и некоторые прошивки иногда игнорируют timeout плагина. */
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new GeoTimeoutError("Geolocation timeout")),
+      milliseconds,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 export function isNativeApp() {
   if (typeof window === "undefined") return false;
@@ -122,10 +148,15 @@ export async function ensureLocationPermission(): Promise<boolean> {
   const plugin = await getPlugin();
   if (!plugin) return true; // в WebView разрешение спросит сам getCurrentPosition
   try {
-    let state = normalize(await plugin.checkPermissions());
+    let state = normalize(
+      await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS),
+    );
     if (state !== "granted") {
       state = normalize(
-        await plugin.requestPermissions({ permissions: ["location", "coarseLocation"] }),
+        await withTimeout(
+          plugin.requestPermissions({ permissions: ["location", "coarseLocation"] }),
+          PERMISSION_TIMEOUT_MS,
+        ),
       );
     }
     return state === "granted";
@@ -140,9 +171,20 @@ function browserPosition(): Promise<GeoResult> {
     return Promise.resolve({ error: "unsupported" });
   }
   return new Promise<GeoResult>((resolve) => {
+    let finished = false;
+    const finish = (result: GeoResult) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      resolve(result);
+    };
+    const watchdog = window.setTimeout(
+      () => finish({ error: "timeout" }),
+      POSITION_TIMEOUT_MS,
+    );
     navigator.geolocation.getCurrentPosition(
       (pos) =>
-        resolve({
+        finish({
           point: {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
@@ -150,7 +192,7 @@ function browserPosition(): Promise<GeoResult> {
           },
         }),
       (err) =>
-        resolve({
+        finish({
           error:
             err.code === err.PERMISSION_DENIED
               ? "denied"
@@ -158,7 +200,7 @@ function browserPosition(): Promise<GeoResult> {
                 ? "timeout"
                 : "unavailable",
         }),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: POSITION_TIMEOUT_MS, maximumAge: 120000 },
     );
   });
 }
@@ -171,11 +213,14 @@ export async function getCurrentPosition(): Promise<GeoResult> {
     const allowed = await ensureLocationPermission();
     if (!allowed) return { error: "denied" };
     try {
-      const pos = await plugin.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000,
-      });
+      const pos = await withTimeout(
+        plugin.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: POSITION_TIMEOUT_MS,
+          maximumAge: 120000,
+        }),
+        POSITION_TIMEOUT_MS,
+      );
       return {
         point: {
           lat: pos.coords.latitude,
@@ -183,10 +228,12 @@ export async function getCurrentPosition(): Promise<GeoResult> {
           accuracy: pos.coords.accuracy,
         },
       };
-    } catch {
-      // Падаем на браузерный путь: часть WebView отдаёт координаты сама.
+    } catch (error) {
+      // После реального тайм-аута не запускаем ещё один долгий поиск в WebView.
+      if (error instanceof GeoTimeoutError) return { error: "timeout" };
+      // При ошибке плагина пробуем WebView: часть прошивок отдаёт координаты сама.
       const fallback = await browserPosition();
-      return fallback.point ? fallback : { error: "unavailable" };
+      return fallback;
     }
   }
 
