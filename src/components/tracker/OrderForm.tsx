@@ -3,6 +3,8 @@ import {
   useClients,
   useOrders,
   useRates,
+  useShiftRates,
+  useSettings,
   uid,
   formatMoney,
 
