@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   DEFAULT_GEOCODER_KEY,
   DEFAULT_YANDEX_KEY,
@@ -5,10 +6,94 @@ import {
   useSettings,
   WORK_TYPES,
 } from "@/lib/tracker-storage";
-import { ExternalLink, KeyRound, MapPin, X } from "lucide-react";
+import {
+  checkLocationPermission,
+  ensureLocationPermission,
+  geolocationSupported,
+  getCurrentPosition,
+  isNativeApp,
+  type PermissionState,
+} from "@/lib/geo";
+import {
+  ExternalLink,
+  KeyRound,
+  Loader2,
+  LocateFixed,
+  MapPin,
+  X,
+} from "lucide-react";
 
+const PERMISSION_TEXT: Record<PermissionState, string> = {
+  granted: "Доступ разрешён",
+  denied: "Доступ запрещён",
+  prompt: "Разрешение ещё не запрошено",
+  unknown: "Состояние неизвестно",
+};
+
+function GeolocationSection() {
+  const [state, setState] = useState<PermissionState>("unknown");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    void checkLocationPermission().then(setState);
+  }, []);
+
+  async function request() {
+    setBusy(true);
+    setNote(null);
+    await ensureLocationPermission();
+    const { point, error } = await getCurrentPosition();
+    setState(await checkLocationPermission());
+    setBusy(false);
+    if (point) {
+      setNote(`Местоположение получено: ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`);
+    } else if (error === "denied") {
+      setNote(
+        "Android отказал в доступе. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ.",
+      );
+    } else {
+      setNote("Не удалось получить координаты. Включите GPS и попробуйте ещё раз.");
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+        Геолокация
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        Нужна для кнопки «Я здесь» на карте и для маршрута от вашего текущего места.
+      </p>
+      <p className="text-sm">
+        Статус: <span className="font-semibold">{PERMISSION_TEXT[state]}</span>
+        {!geolocationSupported() && " — устройство не поддерживает"}
+      </p>
+      <button
+        type="button"
+        onClick={request}
+        disabled={busy}
+        className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <LocateFixed className="size-4" />
+        )}
+        {busy ? "Проверяю..." : "Запросить доступ к геолокации"}
+      </button>
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
+      {!isNativeApp() && (
+        <p className="text-xs text-muted-foreground">
+          В браузере разрешение выдаётся для сайта, в приложении — в настройках Android.
+        </p>
+      )}
+    </section>
+  );
+}
 
 export function SettingsView({ onClose }: { onClose: () => void }) {
+
   const [rates, setRates] = useRates();
   const [settings, setSettings] = useSettings();
 
