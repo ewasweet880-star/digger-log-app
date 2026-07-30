@@ -51,16 +51,32 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [notes, setNotes] = useState(editing?.notes ?? "");
 
   const rate = rates[workType];
+  const shiftRate = shiftRates[workType];
+  const shiftHours = settings.shiftHours || 8;
   const busyDates = orders
     .filter((o) => o.status !== "cancelled" && o.id !== editing?.id)
     .map((o) => o.date);
 
+  // подставляем цену транспортировки из настроек в новый заказ
+  useEffect(() => {
+    if (editing || delivery) return;
+    if (settings.deliveryPrice) setDelivery(String(settings.deliveryPrice));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.deliveryPrice]);
+
   function autoPrice(nextHours: string, nextType: string) {
+    if (priceTouched) return;
     const r = rates[nextType];
-    if (priceTouched || !r) return;
+    const s = shiftRates[nextType];
     const h = Number(nextHours);
-    if (h > 0) setPrice(String(Math.round(h * r)));
+    if (s && h >= shiftHours) {
+      setPrice(String(Math.round(s)));
+      return;
+    }
+    if (r && h > 0) setPrice(String(Math.round(h * r)));
+    else if (s && !h) setPrice(String(Math.round(s)));
   }
+
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
