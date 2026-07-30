@@ -272,7 +272,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
                   onClick={() => {
                     setPriceTouched(false);
                     const h = Number(hours);
-                    if (h > 0) setPrice(String(Math.round(h * rate)));
+                    if (shiftRate && h >= shiftHours) setPrice(String(shiftRate));
+                    else if (rate && h > 0) setPrice(String(Math.round(h * rate)));
+                    else if (shiftRate) setPrice(String(shiftRate));
                   }}
                   className="ml-1 text-primary font-semibold"
                 >
