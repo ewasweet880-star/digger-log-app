@@ -12,9 +12,21 @@ const config: CapacitorConfig = {
     // когда опубликуете проект.
     url: "https://digger-log-app.lovable.app?forceHideBadge=true",
     cleartext: true,
+    androidScheme: "https",
+    // Домены, внутри которых работает мост Capacitor (нужно для геолокации).
+    allowNavigation: [
+      "digger-log-app.lovable.app",
+      "*.lovable.app",
+      "*.lovableproject.com",
+      "api-maps.yandex.ru",
+      "geocode-maps.yandex.ru",
+    ],
   },
   android: {
     backgroundColor: "#0e0f11",
+    // Нужно, чтобы WebView отдавал координаты странице, загруженной по https.
+    allowMixedContent: true,
+    webContentsDebuggingEnabled: true,
   },
   plugins: {
     SplashScreen: {
@@ -22,6 +34,10 @@ const config: CapacitorConfig = {
       backgroundColor: "#0e0f11",
       androidSpinnerStyle: "small",
       showSpinner: false,
+    },
+    Geolocation: {
+      // Плагин добавляет в манифест ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION,
+      // благодаря чему в настройках приложения появляется пункт «Геоданные».
     },
   },
 };

@@ -1,12 +1,12 @@
 /**
  * Определение текущего местоположения.
  *
- * В нативном приложении (APK) используется плагин Capacitor Geolocation —
- * он умеет запрашивать системное разрешение Android. В браузере работает
- * стандартный navigator.geolocation.
+ * В нативном приложении (APK) сначала пробуем плагин Capacitor Geolocation —
+ * только он умеет запросить системное разрешение Android (после этого пункт
+ * «Геоданные» появляется в настройках приложения). Если моста Capacitor нет
+ * (страница открыта по server.url и bridge не поднялся) — работаем через
+ * обычный navigator.geolocation WebView.
  */
-
-import { isNativeApp } from "./native-store";
 
 export interface GeoPoint {
   lat: number;
@@ -24,11 +24,18 @@ export interface GeoResult {
 export const GEO_ERROR_TEXT: Record<GeoError, string> = {
   unsupported: "Устройство не поддерживает определение местоположения.",
   denied:
-    "Доступ к геолокации запрещён. Разрешите его в настройках телефона для этого приложения.",
+    "Доступ к геолокации запрещён. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ.",
   unavailable:
     "Не удалось определить местоположение. Включите GPS и попробуйте ещё раз.",
   timeout: "Определение местоположения заняло слишком много времени.",
 };
+
+export function isNativeApp() {
+  if (typeof window === "undefined") return false;
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+    .Capacitor;
+  return Boolean(cap?.isNativePlatform?.());
+}
 
 export function geolocationSupported() {
   return (
@@ -38,7 +45,9 @@ export function geolocationSupported() {
 
 type GeoPlugin = {
   checkPermissions(): Promise<{ location: string; coarseLocation?: string }>;
-  requestPermissions(): Promise<{ location: string; coarseLocation?: string }>;
+  requestPermissions(o?: {
+    permissions?: string[];
+  }): Promise<{ location: string; coarseLocation?: string }>;
   getCurrentPosition(o?: {
     enableHighAccuracy?: boolean;
     timeout?: number;
@@ -48,57 +57,83 @@ type GeoPlugin = {
 
 let pluginPromise: Promise<GeoPlugin | null> | null = null;
 
+/**
+ * Плагин пробуем подгрузить всегда, когда есть объект Capacitor: даже если
+ * isNativePlatform() ещё не отвечает, вызовы просто отработают ошибкой и мы
+ * упадём на браузерный путь.
+ */
 function getPlugin(): Promise<GeoPlugin | null> {
-  if (!isNativeApp()) return Promise.resolve(null);
+  if (typeof window === "undefined") return Promise.resolve(null);
+  const hasCapacitor = Boolean(
+    (window as unknown as { Capacitor?: unknown }).Capacitor,
+  );
+  if (!hasCapacitor) return Promise.resolve(null);
   if (!pluginPromise) {
     pluginPromise = import("@capacitor/geolocation")
-      .then((m) => m.Geolocation as unknown as GeoPlugin)
+      .then((m) => (m.Geolocation as unknown as GeoPlugin) ?? null)
       .catch(() => null);
   }
   return pluginPromise;
 }
 
-/** Проверяет (и при необходимости запрашивает) разрешение на геолокацию. */
-export async function ensureLocationPermission(): Promise<boolean> {
+export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
+
+function normalize(status: {
+  location?: string;
+  coarseLocation?: string;
+}): PermissionState {
+  const v = [status.location, status.coarseLocation];
+  if (v.includes("granted")) return "granted";
+  if (v.includes("denied")) return "denied";
+  if (v.includes("prompt") || v.includes("prompt-with-rationale")) return "prompt";
+  return "unknown";
+}
+
+/** Текущее состояние разрешения (без запроса окна). */
+export async function checkLocationPermission(): Promise<PermissionState> {
   const plugin = await getPlugin();
-  if (!plugin) return true; // в браузере разрешение спросит сам getCurrentPosition
-  try {
-    let status = await plugin.checkPermissions();
-    if (status.location !== "granted" && status.coarseLocation !== "granted") {
-      status = await plugin.requestPermissions();
+  if (plugin) {
+    try {
+      return normalize(await plugin.checkPermissions());
+    } catch {
+      return "unknown";
     }
-    return status.location === "granted" || status.coarseLocation === "granted";
+  }
+  try {
+    const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+    if (!perms?.query) return "unknown";
+    const res = await perms.query({ name: "geolocation" as PermissionName });
+    return res.state as PermissionState;
   } catch {
-    return false;
+    return "unknown";
   }
 }
 
-/** Возвращает текущие координаты. Вызывать только после подтверждения пользователем. */
-export async function getCurrentPosition(): Promise<GeoResult> {
-  if (!geolocationSupported()) return { error: "unsupported" };
-
+/**
+ * Запрашивает системное разрешение. В нативном приложении именно этот вызов
+ * заставляет Android показать диалог и добавить пункт в настройки приложения.
+ */
+export async function ensureLocationPermission(): Promise<boolean> {
   const plugin = await getPlugin();
-  if (plugin) {
-    const allowed = await ensureLocationPermission();
-    if (!allowed) return { error: "denied" };
-    try {
-      const pos = await plugin.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000,
-      });
-      return {
-        point: {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        },
-      };
-    } catch {
-      return { error: "unavailable" };
+  if (!plugin) return true; // в WebView разрешение спросит сам getCurrentPosition
+  try {
+    let state = normalize(await plugin.checkPermissions());
+    if (state !== "granted") {
+      state = normalize(
+        await plugin.requestPermissions({ permissions: ["location", "coarseLocation"] }),
+      );
     }
+    return state === "granted";
+  } catch {
+    // Плагин недоступен (нет моста) — пусть попробует WebView.
+    return true;
   }
+}
 
+function browserPosition(): Promise<GeoResult> {
+  if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+    return Promise.resolve({ error: "unsupported" });
+  }
   return new Promise<GeoResult>((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (pos) =>
@@ -121,4 +156,34 @@ export async function getCurrentPosition(): Promise<GeoResult> {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
   });
+}
+
+/** Возвращает текущие координаты. Вызывать только после подтверждения пользователем. */
+export async function getCurrentPosition(): Promise<GeoResult> {
+  const plugin = await getPlugin();
+
+  if (plugin) {
+    const allowed = await ensureLocationPermission();
+    if (!allowed) return { error: "denied" };
+    try {
+      const pos = await plugin.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      });
+      return {
+        point: {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        },
+      };
+    } catch {
+      // Падаем на браузерный путь: часть WebView отдаёт координаты сама.
+      const fallback = await browserPosition();
+      return fallback.point ? fallback : { error: "unavailable" };
+    }
+  }
+
+  return browserPosition();
 }
