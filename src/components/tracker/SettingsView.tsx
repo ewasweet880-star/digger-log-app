@@ -131,26 +131,29 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               «За час» — сумма заказа считается сама: часы × цена за час. «За смену» —
               фиксированная цена за полный рабочий день.
             </p>
-            <div className="flex items-center gap-3 pt-1">
-              <span className="flex-1" />
-              <span className="w-24 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] gap-2 items-center pt-1">
+              <span />
+              <span className="text-center text-[11px] uppercase tracking-wider text-muted-foreground">
                 За час
               </span>
-              <span className="w-24 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
+              <span className="text-center text-[11px] uppercase tracking-wider text-muted-foreground">
                 За смену
               </span>
             </div>
             <div className="space-y-2">
               {WORK_TYPES.map((w) => (
-                <div key={w} className="flex items-center gap-3">
-                  <span className="flex-1 text-sm truncate">{w}</span>
+                <div
+                  key={w}
+                  className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] gap-2 items-center"
+                >
+                  <span className="text-sm leading-tight break-words">{w}</span>
                   <input
                     type="number"
                     min="0"
                     step="100"
                     value={rates[w] ?? ""}
                     onChange={(e) => setRate(setRates, w, e.target.value)}
-                    className="input w-24 text-right"
+                    className="input text-right"
                     placeholder="—"
                     aria-label={`${w}: цена за час`}
                   />
@@ -160,13 +163,14 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                     step="500"
                     value={shiftRates[w] ?? ""}
                     onChange={(e) => setRate(setShiftRates, w, e.target.value)}
-                    className="input w-24 text-right"
+                    className="input text-right"
                     placeholder="—"
                     aria-label={`${w}: цена за смену`}
                   />
                 </div>
               ))}
             </div>
+
           </section>
 
           <section className="space-y-2">
