@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useClients,
   useOrders,
   useRates,
+  useShiftRates,
+  useSettings,
   uid,
   formatMoney,
 
@@ -24,6 +26,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [orders, setOrders] = useOrders();
   const [clients, setClients] = useClients();
   const [rates] = useRates();
+  const [shiftRates] = useShiftRates();
+  const [settings] = useSettings();
 
   const [clientName, setClientName] = useState(editing?.clientName ?? "");
   const [clientPhone, setClientPhone] = useState(editing?.clientPhone ?? "");
@@ -47,16 +51,32 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [notes, setNotes] = useState(editing?.notes ?? "");
 
   const rate = rates[workType];
+  const shiftRate = shiftRates[workType];
+  const shiftHours = settings.shiftHours || 8;
   const busyDates = orders
     .filter((o) => o.status !== "cancelled" && o.id !== editing?.id)
     .map((o) => o.date);
 
+  // подставляем цену транспортировки из настроек в новый заказ
+  useEffect(() => {
+    if (editing || delivery) return;
+    if (settings.deliveryPrice) setDelivery(String(settings.deliveryPrice));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.deliveryPrice]);
+
   function autoPrice(nextHours: string, nextType: string) {
+    if (priceTouched) return;
     const r = rates[nextType];
-    if (priceTouched || !r) return;
+    const s = shiftRates[nextType];
     const h = Number(nextHours);
-    if (h > 0) setPrice(String(Math.round(h * r)));
+    if (s && h >= shiftHours) {
+      setPrice(String(Math.round(s)));
+      return;
+    }
+    if (r && h > 0) setPrice(String(Math.round(h * r)));
+    else if (s && !h) setPrice(String(Math.round(s)));
   }
+
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -239,16 +259,22 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
               placeholder="0"
             />
           </Field>
-          {rate ? (
+          {rate || shiftRate ? (
             <p className="-mt-2 text-xs text-muted-foreground">
-              Ставка {rate.toLocaleString("ru-RU")} ₽/ч — сумма считается автоматически.
+              {rate ? `Ставка ${rate.toLocaleString("ru-RU")} ₽/ч. ` : ""}
+              {shiftRate
+                ? `Смена (${shiftHours} ч) — ${shiftRate.toLocaleString("ru-RU")} ₽. `
+                : ""}
+              Сумма считается автоматически.
               {priceTouched && (
                 <button
                   type="button"
                   onClick={() => {
                     setPriceTouched(false);
                     const h = Number(hours);
-                    if (h > 0) setPrice(String(Math.round(h * rate)));
+                    if (shiftRate && h >= shiftHours) setPrice(String(shiftRate));
+                    else if (rate && h > 0) setPrice(String(Math.round(h * rate)));
+                    else if (shiftRate) setPrice(String(shiftRate));
                   }}
                   className="ml-1 text-primary font-semibold"
                 >

@@ -62,6 +62,7 @@ const KEY_ORDERS = "excav.orders.v1";
 const KEY_EXPENSES = "excav.expenses.v1";
 const KEY_CLIENTS = "excav.clients.v1";
 const KEY_RATES = "excav.rates.v1";
+const KEY_SHIFT_RATES = "excav.shiftRates.v1";
 const KEY_SETTINGS = "excav.settings.v1";
 
 function read<T>(key: string, fallback: T): T {
@@ -234,9 +235,18 @@ export function useRates() {
   return useKey<Rates>(KEY_RATES, {});
 }
 
+/** Ставка ₽ за смену по виду работ */
+export function useShiftRates() {
+  return useKey<Rates>(KEY_SHIFT_RATES, {});
+}
+
 export interface Settings {
   yandexApiKey?: string;
   yandexGeocoderKey?: string;
+  /** Сколько часов в одной смене */
+  shiftHours?: number;
+  /** Цена подачи (транспортировки) техники по умолчанию, ₽ */
+  deliveryPrice?: number;
 }
 
 /** Ключ по умолчанию для JavaScript API карт, можно заменить в «Настройках». */

@@ -4,6 +4,7 @@ import {
   DEFAULT_YANDEX_KEY,
   useRates,
   useSettings,
+  useShiftRates,
   WORK_TYPES,
 } from "@/lib/tracker-storage";
 import {
@@ -95,7 +96,21 @@ function GeolocationSection() {
 export function SettingsView({ onClose }: { onClose: () => void }) {
 
   const [rates, setRates] = useRates();
+  const [shiftRates, setShiftRates] = useShiftRates();
   const [settings, setSettings] = useSettings();
+
+  function setRate(
+    setter: typeof setRates,
+    work: string,
+    value: string,
+  ) {
+    setter((prev) => {
+      const next = { ...prev };
+      if (!value) delete next[work];
+      else next[work] = Number(value);
+      return next;
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -110,12 +125,22 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         <div className="p-4 space-y-6">
           <section className="space-y-2">
             <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              Ставки, ₽ за час
+              Цены по видам работ, ₽
             </h3>
             <p className="text-sm text-muted-foreground">
-              Укажите цену за час — сумма заказа посчитается сама по часам.
+              «За час» — сумма заказа считается сама: часы × цена за час. «За смену» —
+              фиксированная цена за полный рабочий день.
             </p>
-            <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-3 pt-1">
+              <span className="flex-1" />
+              <span className="w-24 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
+                За час
+              </span>
+              <span className="w-24 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
+                За смену
+              </span>
+            </div>
+            <div className="space-y-2">
               {WORK_TYPES.map((w) => (
                 <div key={w} className="flex items-center gap-3">
                   <span className="flex-1 text-sm truncate">{w}</span>
@@ -124,20 +149,67 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                     min="0"
                     step="100"
                     value={rates[w] ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setRates((prev) => {
-                        const next = { ...prev };
-                        if (!v) delete next[w];
-                        else next[w] = Number(v);
-                        return next;
-                      });
-                    }}
-                    className="input w-32 text-right"
+                    onChange={(e) => setRate(setRates, w, e.target.value)}
+                    className="input w-24 text-right"
                     placeholder="—"
+                    aria-label={`${w}: цена за час`}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={shiftRates[w] ?? ""}
+                    onChange={(e) => setRate(setShiftRates, w, e.target.value)}
+                    className="input w-24 text-right"
+                    placeholder="—"
+                    aria-label={`${w}: цена за смену`}
                   />
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+              Транспортировка и смена
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Цена подачи техники подставится в новый заказ отдельной строкой — её можно
+              изменить в самом заказе.
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="flex-1 text-sm">Транспортировка (подача), ₽</span>
+              <input
+                type="number"
+                min="0"
+                step="500"
+                value={settings.deliveryPrice ?? ""}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    deliveryPrice: e.target.value ? Number(e.target.value) : undefined,
+                  }))
+                }
+                className="input w-32 text-right"
+                placeholder="—"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="flex-1 text-sm">Часов в смене</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={settings.shiftHours ?? ""}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    shiftHours: e.target.value ? Number(e.target.value) : undefined,
+                  }))
+                }
+                className="input w-32 text-right"
+                placeholder="8"
+              />
             </div>
           </section>
 
