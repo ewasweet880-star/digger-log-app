@@ -4,7 +4,7 @@ import {
   DEFAULT_YANDEX_KEY,
   useRates,
   useSettings,
-  WORK_TYPES,
+  useShiftRates,
 } from "@/lib/tracker-storage";
 import {
   checkLocationPermission,
