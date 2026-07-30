@@ -76,6 +76,11 @@ function getPlugin(): Promise<GeoPlugin | null> {
   return pluginPromise;
 }
 
+/** Доступен ли нативный плагин геолокации (мост Capacitor поднялся). */
+export async function nativeGeolocationAvailable(): Promise<boolean> {
+  return Boolean(await getPlugin());
+}
+
 export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
 
 function normalize(status: {
