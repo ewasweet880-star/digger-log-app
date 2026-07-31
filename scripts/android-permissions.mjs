@@ -37,6 +37,11 @@ if (CHECK_ONLY) {
   process.exit(1);
 }
 
+if (!xml.includes("<application")) {
+  console.error(`Не найден тег <application> в ${FILE}. Манифест повреждён.`);
+  process.exit(1);
+}
+
 xml = xml.replace(/<application/, `${missing.join("\n    ")}\n\n    <application`);
 writeFileSync(FILE, xml);
 console.log(`Добавлено в манифест:\n  ${missing.join("\n  ")}`);

@@ -36,8 +36,8 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     Geolocation: {
-      // Плагин добавляет в манифест ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION,
-      // благодаря чему в настройках приложения появляется пункт «Геоданные».
+      // Плагин сам НЕ добавляет uses-permission в итоговый AndroidManifest.xml.
+      // Их гарантированно добавляет команда npm run android:sync.
     },
   },
 };
