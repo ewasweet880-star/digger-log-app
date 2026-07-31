@@ -73,7 +73,9 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         const center = lat != null && lng != null ? [lat, lng] : DEFAULT_CENTER;
         const map = new ymaps.Map(
           boxRef.current,
-          { center, zoom: lat != null ? 16 : 10, controls: ["zoomControl", "geolocationControl"] },
+          // Встроенный geolocationControl Яндекса использует WebView API и на
+          // Android может искать бесконечно. Используем нашу кнопку «Я здесь».
+          { center, zoom: lat != null ? 16 : 10, controls: ["zoomControl"] },
           { suppressMapOpenBlock: true },
         );
         mapRef.current = map;
