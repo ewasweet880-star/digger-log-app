@@ -32,7 +32,7 @@ export const GEO_ERROR_TEXT: Record<GeoError, string> = {
 };
 
 const PERMISSION_TIMEOUT_MS = 10_000;
-const POSITION_TIMEOUT_MS = 20_000;
+const POSITION_TIMEOUT_MS = 15_000;
 
 class GeoTimeoutError extends Error {}
 
@@ -63,6 +63,16 @@ export function isNativeApp() {
   return Boolean(cap?.isNativePlatform?.());
 }
 
+function nativePluginRegistered() {
+  if (typeof window === "undefined") return false;
+  const cap = (
+    window as unknown as {
+      Capacitor?: { isNativePlatform?: () => boolean; isPluginAvailable?: (name: string) => boolean };
+    }
+  ).Capacitor;
+  return Boolean(cap?.isNativePlatform?.() && cap.isPluginAvailable?.("Geolocation"));
+}
+
 export function geolocationSupported() {
   return (
     isNativeApp() || (typeof navigator !== "undefined" && "geolocation" in navigator)
@@ -84,16 +94,12 @@ type GeoPlugin = {
 let pluginPromise: Promise<GeoPlugin | null> | null = null;
 
 /**
- * Плагин пробуем подгрузить всегда, когда есть объект Capacitor: даже если
- * isNativePlatform() ещё не отвечает, вызовы просто отработают ошибкой и мы
- * упадём на браузерный путь.
+ * Импорт JS-модуля сам по себе ещё не означает, что плагин встроен в APK.
+ * Сначала проверяем нативную регистрацию, иначе вызов прокси может не ответить.
  */
 function getPlugin(): Promise<GeoPlugin | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
-  const hasCapacitor = Boolean(
-    (window as unknown as { Capacitor?: unknown }).Capacitor,
-  );
-  if (!hasCapacitor) return Promise.resolve(null);
+  if (!nativePluginRegistered()) return Promise.resolve(null);
   if (!pluginPromise) {
     pluginPromise = import("@capacitor/geolocation")
       .then((m) => (m.Geolocation as unknown as GeoPlugin) ?? null)
@@ -104,7 +110,7 @@ function getPlugin(): Promise<GeoPlugin | null> {
 
 /** Доступен ли нативный плагин геолокации (мост Capacitor поднялся). */
 export async function nativeGeolocationAvailable(): Promise<boolean> {
-  return Boolean(await getPlugin());
+  return nativePluginRegistered() && Boolean(await getPlugin());
 }
 
 export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
@@ -163,8 +169,7 @@ export async function ensureLocationPermission(): Promise<boolean> {
     }
     return state === "granted";
   } catch {
-    // Плагин недоступен (нет моста) — пусть попробует WebView.
-    return true;
+    return false;
   }
 }
 
@@ -202,7 +207,7 @@ function browserPosition(): Promise<GeoResult> {
                 ? "timeout"
                 : "unavailable",
         }),
-      { enableHighAccuracy: true, timeout: POSITION_TIMEOUT_MS, maximumAge: 120000 },
+      { enableHighAccuracy: false, timeout: POSITION_TIMEOUT_MS, maximumAge: 300000 },
     );
   });
 }
@@ -217,9 +222,11 @@ export async function getCurrentPosition(): Promise<GeoResult> {
     try {
       const pos = await withTimeout(
         plugin.getCurrentPosition({
-          enableHighAccuracy: true,
+          // Сетевое местоположение обычно приходит сразу даже в кабине. Для
+          // постановки точки на карте его точности достаточно.
+          enableHighAccuracy: false,
           timeout: POSITION_TIMEOUT_MS,
-          maximumAge: 120000,
+          maximumAge: 300000,
         }),
         POSITION_TIMEOUT_MS,
       );
@@ -231,11 +238,17 @@ export async function getCurrentPosition(): Promise<GeoResult> {
         },
       };
     } catch (error) {
-      // После реального тайм-аута не запускаем ещё один долгий поиск в WebView.
       if (error instanceof GeoTimeoutError) return { error: "timeout" };
-      // При ошибке плагина пробуем WebView: часть прошивок отдаёт координаты сама.
-      const fallback = await browserPosition();
-      return fallback;
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("permission") || message.includes("restricted")) {
+        return { error: "denied" };
+      }
+      if (message.includes("timeout") || message.includes("time")) {
+        return { error: "timeout" };
+      }
+      // Не запускаем второй параллельный поиск через WebView после ошибки
+      // нативного провайдера — именно это раньше удваивало ожидание.
+      return { error: "unavailable" };
     }
   }
 
