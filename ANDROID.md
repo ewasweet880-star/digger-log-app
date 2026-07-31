@@ -16,12 +16,12 @@
    ```
 2. Добавьте платформу Android (один раз):
    ```bash
-   npx cap add android
+   npm run android:add
    ```
 3. Соберите веб-часть и синхронизируйте:
    ```bash
    npm run build
-   npx cap sync android
+   npm run android:sync
    ```
 4. Откройте нативный проект:
    ```bash
@@ -40,9 +40,15 @@
 git pull
 npm install
 npm run build
-npx cap sync android
+npm run android:sync
 ```
-`npx cap sync android` обязателен после добавления плагина `@capacitor/preferences` — иначе заказы не сохранятся в памяти телефона.
+`npm run android:sync` синхронизирует плагины, автоматически добавляет разрешения
+геолокации и проверяет манифест. Не заменяйте эту команду обычной
+`npx cap sync android`.
+
+Важно: `@capacitor/geolocation` сам не записывает эти строки в манифест. Команды
+`android:add` и `android:sync` запускают наш обязательный патч напрямую, поэтому
+результат не зависит от работы дополнительных Capacitor-хуков.
 
 Важно: APK открывает опубликованный адрес `digger-log-app.lovable.app`. Сначала
 нажмите **Publish** в Lovable, иначе APK продолжит выполнять старую опубликованную
@@ -68,9 +74,17 @@ npx cap sync android
 git pull
 npm install
 npm run build
-npx cap sync android
-npm run android:fix     # допишет разрешения в AndroidManifest.xml, если их нет
+npm run android:sync    # синхронизация + добавление и проверка разрешений
 ```
+
+После команды обязательно должна появиться строка:
+
+```text
+✓ Разрешения геолокации есть в AndroidManifest.xml.
+```
+
+Даже если запустить `npx cap sync android` вручную, хук
+`capacitor:sync:after` теперь автоматически исправит манифест.
 
 Проверьте `android/app/src/main/AndroidManifest.xml` — внутри `<manifest>`,
 до `<application>`, должны быть строки:
@@ -82,10 +96,14 @@ npm run android:fix     # допишет разрешения в AndroidManifest
 ```
 
 Затем:
-1. В Android Studio **Build → Clean Project**, потом **Build → Build APK(s)**.
-2. На телефоне **удалите старое приложение** (обновление поверх часто оставляет
-   старый манифест) и установите новый APK.
-3. Откройте «Настройки → Геолокация → Запросить доступ» — появится системный
+1. Удалите старый APK-файл из папки `android/app/build/outputs/apk/debug`, чтобы
+   случайно не установить предыдущую сборку.
+2. В Android Studio **Build → Clean Project**, потом **Build → Build APK(s)**.
+3. На телефоне полностью **удалите старое приложение** и установите новый файл
+   `android/app/build/outputs/apk/debug/app-debug.apk`.
+4. Сразу проверьте «Настройки телефона → Приложения → Смена → Разрешения» — там
+   должен появиться пункт «Геоданные».
+5. Откройте «Настройки → Геолокация → Запросить доступ» — появится системный
    диалог, а пункт «Разрешения → Геоданные» появится в настройках телефона.
 
 
