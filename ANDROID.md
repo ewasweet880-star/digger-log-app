@@ -14,20 +14,16 @@
    cd <папка-проекта>
    npm install
    ```
-2. Добавьте платформу Android (один раз):
-   ```bash
-   npm run android:add
-   ```
-3. Соберите веб-часть и синхронизируйте:
+2. Android-проект уже находится в репозитории. Соберите веб-часть и синхронизируйте:
    ```bash
    npm run build
    npm run android:sync
    ```
-4. Откройте нативный проект:
+3. Откройте нативный проект:
    ```bash
    npx cap open android
    ```
-5. В Android Studio: **Build → Build Bundle(s)/APK(s) → Build APK(s)**.
+4. В Android Studio: **Build → Build Bundle(s)/APK(s) → Build APK(s)**.
    Готовый файл: `android/app/build/outputs/apk/debug/app-debug.apk` — его можно скинуть отцу на телефон и установить.
 
 ## Про `capacitor.config.ts`
@@ -46,9 +42,9 @@ npm run android:sync
 геолокации и проверяет манифест. Не заменяйте эту команду обычной
 `npx cap sync android`.
 
-Важно: `@capacitor/geolocation` сам не записывает эти строки в манифест. Команды
-`android:add` и `android:sync` запускают наш обязательный патч напрямую, поэтому
-результат не зависит от работы дополнительных Capacitor-хуков.
+Важно: `@capacitor/geolocation` сам не записывает эти строки в манифест. Они уже
+добавлены в сохранённый Android-проект, а `android:sync` дополнительно проверяет их
+перед сборкой.
 
 Важно: APK открывает опубликованный адрес `digger-log-app.lovable.app`. Сначала
 нажмите **Publish** в Lovable, иначе APK продолжит выполнять старую опубликованную
@@ -83,8 +79,8 @@ npm run android:sync    # синхронизация + добавление и �
 ✓ Разрешения геолокации есть в AndroidManifest.xml.
 ```
 
-Даже если запустить `npx cap sync android` вручную, хук
-`capacitor:sync:after` теперь автоматически исправит манифест.
+Не заменяйте `npm run android:sync` командой `npx cap sync android`: только npm-команда
+гарантированно проверяет разрешения перед открытием Android Studio.
 
 Проверьте `android/app/src/main/AndroidManifest.xml` — внутри `<manifest>`,
 до `<application>`, должны быть строки:

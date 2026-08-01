@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "app.lovable.81bd95a7d973484bbf89af068ce1d2cb",
+  // Каждый сегмент Android package name должен начинаться с буквы.
+  appId: "app.lovable.diggerlog",
   appName: "Смена",
   // Каталог со статикой. Приложение работает по server.url (см. ниже),
   // но Capacitor требует существующую папку — используем public/.
