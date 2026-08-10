@@ -40,6 +40,12 @@ type Tab = "orders" | "calendar" | "clients" | "expenses" | "money";
 function App() {
   const [tab, setTab] = useState<Tab>("orders");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [geoScreen, setGeoScreen] = useState(false);
+
+  // При первом запуске спрашиваем разрешение; отказ запоминается.
+  useEffect(() => {
+    if (readGeoConsent() === null) setGeoScreen(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground max-w-2xl mx-auto">
@@ -70,7 +76,14 @@ function App() {
         {tab === "money" && <EarningsView />}
       </main>
 
-      {settingsOpen && <SettingsView onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsView
+          onClose={() => setSettingsOpen(false)}
+          onOpenGeoScreen={() => setGeoScreen(true)}
+        />
+      )}
+
+      {geoScreen && <LocationPermissionScreen onDone={() => setGeoScreen(false)} />}
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border">
         <div className="max-w-2xl mx-auto grid grid-cols-5">
