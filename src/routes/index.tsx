@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, ClipboardList, Fuel, Settings, Users, Wallet } from "lucide-react";
 import { OrdersView } from "@/components/tracker/OrdersView";
 import { CalendarView } from "@/components/tracker/CalendarView";
@@ -7,6 +7,11 @@ import { ClientsView } from "@/components/tracker/ClientsView";
 import { EarningsView } from "@/components/tracker/EarningsView";
 import { ExpensesView } from "@/components/tracker/ExpensesView";
 import { SettingsView } from "@/components/tracker/SettingsView";
+import {
+  LocationPermissionScreen,
+  readGeoConsent,
+} from "@/components/tracker/LocationPermissionScreen";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,6 +40,12 @@ type Tab = "orders" | "calendar" | "clients" | "expenses" | "money";
 function App() {
   const [tab, setTab] = useState<Tab>("orders");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [geoScreen, setGeoScreen] = useState(false);
+
+  // При первом запуске спрашиваем разрешение; отказ запоминается.
+  useEffect(() => {
+    if (readGeoConsent() === null) setGeoScreen(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground max-w-2xl mx-auto">
@@ -65,7 +76,14 @@ function App() {
         {tab === "money" && <EarningsView />}
       </main>
 
-      {settingsOpen && <SettingsView onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsView
+          onClose={() => setSettingsOpen(false)}
+          onOpenGeoScreen={() => setGeoScreen(true)}
+        />
+      )}
+
+      {geoScreen && <LocationPermissionScreen onDone={() => setGeoScreen(false)} />}
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border">
         <div className="max-w-2xl mx-auto grid grid-cols-5">
