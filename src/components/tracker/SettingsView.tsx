@@ -15,6 +15,7 @@ import {
   nativeGeolocationAvailable,
   type PermissionState,
 } from "@/lib/geo";
+import { clearGeoConsent } from "@/components/tracker/LocationPermissionScreen";
 import {
   ExternalLink,
   KeyRound,
@@ -31,7 +32,7 @@ const PERMISSION_TEXT: Record<PermissionState, string> = {
   unknown: "Состояние неизвестно",
 };
 
-function GeolocationSection() {
+function GeolocationSection({ onOpenGeoScreen }: { onOpenGeoScreen?: () => void }) {
   const [state, setState] = useState<PermissionState>("unknown");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -95,6 +96,18 @@ function GeolocationSection() {
         )}
         {busy ? "Проверяю..." : "Запросить доступ к геолокации"}
       </button>
+      {onOpenGeoScreen && (
+        <button
+          type="button"
+          onClick={() => {
+            clearGeoConsent();
+            onOpenGeoScreen();
+          }}
+          className="w-full py-2.5 rounded-xl border border-border text-sm font-semibold"
+        >
+          Открыть экран разрешения
+        </button>
+      )}
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
 
       {brokenBuild && (
@@ -129,7 +142,13 @@ npm run android:fix`}
   );
 }
 
-export function SettingsView({ onClose }: { onClose: () => void }) {
+export function SettingsView({
+  onClose,
+  onOpenGeoScreen,
+}: {
+  onClose: () => void;
+  onOpenGeoScreen?: () => void;
+}) {
 
   const [rates, setRates] = useRates();
   const [shiftRates, setShiftRates] = useShiftRates();
@@ -299,7 +318,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             </a>
           </section>
 
-          <GeolocationSection />
+          <GeolocationSection onOpenGeoScreen={onOpenGeoScreen} />
 
 
 
