@@ -11,11 +11,15 @@ import {
   useExpenses,
 } from "@/lib/tracker-storage";
 import { DatePicker } from "@/components/tracker/DatePicker";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useDialog } from "@/hooks/use-dialog";
+import { getMonthRange, isDateInRange } from "@/lib/date-utils";
 
 export function ExpensesView() {
   const [expenses, setExpenses] = useExpenses();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
 
   const sorted = useMemo(
     () => [...expenses].sort((a, b) => b.date.localeCompare(a.date)),
@@ -23,8 +27,7 @@ export function ExpensesView() {
   );
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const { start, endExclusive } = getMonthRange(new Date());
     let month = 0,
       fuelMonth = 0,
       serviceMonth = 0,
@@ -32,14 +35,13 @@ export function ExpensesView() {
       total = 0;
     for (const e of expenses) {
       total += e.amount || 0;
-      if (e.date.startsWith(key)) {
+      if (isDateInRange(e.date, start, endExclusive)) {
         month += e.amount || 0;
         if (e.category === "fuel") {
           fuelMonth += e.amount || 0;
           litersMonth += e.liters || 0;
         }
-        if (e.category === "service" || e.category === "parts")
-          serviceMonth += e.amount || 0;
+        if (e.category === "service" || e.category === "parts") serviceMonth += e.amount || 0;
       }
     }
     return { month, fuelMonth, serviceMonth, litersMonth, total };
@@ -54,8 +56,14 @@ export function ExpensesView() {
     setEditing(null);
   }
 
-  function remove(id: string) {
-    setExpenses((prev) => prev.filter((x) => x.id !== id));
+  function remove(expense: Expense) {
+    setPendingDelete(expense);
+  }
+
+  function confirmRemove() {
+    if (!pendingDelete) return;
+    setExpenses((prev) => prev.filter((expense) => expense.id !== pendingDelete.id));
+    setPendingDelete(null);
   }
 
   return (
@@ -75,9 +83,7 @@ export function ExpensesView() {
             </div>
             <div className="font-bold">{formatMoney(stats.fuelMonth)}</div>
             {stats.litersMonth > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {stats.litersMonth} л
-              </div>
+              <div className="text-xs text-muted-foreground">{stats.litersMonth} л</div>
             )}
           </div>
           <div>
@@ -94,7 +100,7 @@ export function ExpensesView() {
           setEditing(null);
           setFormOpen(true);
         }}
-        className="w-full bg-primary text-primary-foreground rounded-2xl py-3 font-display uppercase tracking-wide flex items-center justify-center gap-2"
+        className="w-full min-h-12 bg-primary text-primary-foreground rounded-2xl py-3 font-display uppercase tracking-wide flex items-center justify-center gap-2"
       >
         <Plus className="size-5" /> Добавить расход
       </button>
@@ -140,9 +146,10 @@ export function ExpensesView() {
                 −{formatMoney(e.amount)}
               </div>
               <button
-                onClick={() => remove(e.id)}
+                type="button"
+                onClick={() => remove(e)}
                 aria-label="Удалить расход"
-                className="p-2 text-muted-foreground"
+                className="min-h-11 min-w-11 text-muted-foreground"
               >
                 <Trash2 className="size-4" />
               </button>
@@ -164,6 +171,15 @@ export function ExpensesView() {
           onSave={save}
         />
       )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Удалить расход?"
+          description={`${expenseLabel(pendingDelete.category)} · ${formatMoney(pendingDelete.amount)}. Запись нельзя будет восстановить.`}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmRemove}
+        />
+      )}
     </div>
   );
 }
@@ -177,13 +193,12 @@ function ExpenseForm({
   onSave: (e: Expense) => void;
   onCancel: () => void;
 }) {
-  const [category, setCategory] = useState<ExpenseCategory>(
-    initial?.category ?? "fuel",
-  );
+  const [category, setCategory] = useState<ExpenseCategory>(initial?.category ?? "fuel");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [liters, setLiters] = useState(initial?.liters ? String(initial.liters) : "");
   const [date, setDate] = useState(initial?.date ?? toISODate(new Date()));
   const [note, setNote] = useState(initial?.note ?? "");
+  useDialog(true, onCancel);
 
   function submit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -199,17 +214,26 @@ function ExpenseForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur overflow-y-auto">
-      <form onSubmit={submit} className="max-w-2xl mx-auto p-4 pb-28 space-y-4">
+    <div
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur overflow-y-auto"
+      role="presentation"
+    >
+      <form
+        onSubmit={submit}
+        className="max-w-2xl mx-auto p-4 pb-28 space-y-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="expense-form-title"
+      >
         <div className="flex items-center gap-3 pt-2">
-          <h2 className="font-display text-2xl uppercase flex-1">
+          <h2 id="expense-form-title" className="font-display text-2xl uppercase flex-1">
             {initial ? "Расход" : "Новый расход"}
           </h2>
           <button
             type="button"
             onClick={onCancel}
             aria-label="Закрыть"
-            className="p-2 rounded-xl bg-secondary"
+            className="min-h-11 min-w-11 rounded-xl bg-secondary"
           >
             <X className="size-5" />
           </button>
@@ -240,6 +264,7 @@ function ExpenseForm({
             className="input mt-1"
             type="number"
             inputMode="decimal"
+            min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
@@ -255,6 +280,8 @@ function ExpenseForm({
               className="input mt-1"
               type="number"
               inputMode="decimal"
+              min="0"
+              step="0.1"
               value={liters}
               onChange={(e) => setLiters(e.target.value)}
             />

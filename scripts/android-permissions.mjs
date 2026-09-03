@@ -30,9 +30,7 @@ if (missing.length === 0) {
 }
 
 if (CHECK_ONLY) {
-  console.error(
-    `Сборка остановлена: в ${FILE} нет разрешений:\n  ${missing.join("\n  ")}`,
-  );
+  console.error(`Сборка остановлена: в ${FILE} нет разрешений:\n  ${missing.join("\n  ")}`);
   console.error("Выполните npm run android:fix и повторите сборку.");
   process.exit(1);
 }

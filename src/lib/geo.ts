@@ -25,8 +25,7 @@ export const GEO_ERROR_TEXT: Record<GeoError, string> = {
   unsupported: "Устройство не поддерживает определение местоположения.",
   denied:
     "Доступ к геолокации запрещён. Откройте «Настройки → Приложения → Смена → Разрешения → Геоданные» и включите доступ.",
-  unavailable:
-    "Не удалось определить местоположение. Включите GPS и попробуйте ещё раз.",
+  unavailable: "Не удалось определить местоположение. Включите GPS и попробуйте ещё раз.",
   timeout:
     "Не удалось получить координаты за 20 секунд. Проверьте, что GPS включён, выйдите на открытое место и попробуйте ещё раз.",
 };
@@ -58,8 +57,7 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
 
 export function isNativeApp() {
   if (typeof window === "undefined") return false;
-  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
-    .Capacitor;
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
   return Boolean(cap?.isNativePlatform?.());
 }
 
@@ -67,16 +65,17 @@ function nativePluginRegistered() {
   if (typeof window === "undefined") return false;
   const cap = (
     window as unknown as {
-      Capacitor?: { isNativePlatform?: () => boolean; isPluginAvailable?: (name: string) => boolean };
+      Capacitor?: {
+        isNativePlatform?: () => boolean;
+        isPluginAvailable?: (name: string) => boolean;
+      };
     }
   ).Capacitor;
   return Boolean(cap?.isNativePlatform?.() && cap.isPluginAvailable?.("Geolocation"));
 }
 
 export function geolocationSupported() {
-  return (
-    isNativeApp() || (typeof navigator !== "undefined" && "geolocation" in navigator)
-  );
+  return isNativeApp() || (typeof navigator !== "undefined" && "geolocation" in navigator);
 }
 
 type GeoPlugin = {
@@ -115,10 +114,7 @@ export async function nativeGeolocationAvailable(): Promise<boolean> {
 
 export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
 
-function normalize(status: {
-  location?: string;
-  coarseLocation?: string;
-}): PermissionState {
+function normalize(status: { location?: string; coarseLocation?: string }): PermissionState {
   const v = [status.location, status.coarseLocation];
   if (v.includes("granted")) return "granted";
   if (v.includes("denied")) return "denied";
@@ -131,9 +127,7 @@ export async function checkLocationPermission(): Promise<PermissionState> {
   const plugin = await getPlugin();
   if (plugin) {
     try {
-      return normalize(
-        await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS),
-      );
+      return normalize(await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS));
     } catch {
       return "unknown";
     }
@@ -156,9 +150,7 @@ export async function ensureLocationPermission(): Promise<boolean> {
   const plugin = await getPlugin();
   if (!plugin) return true; // в WebView разрешение спросит сам getCurrentPosition
   try {
-    let state = normalize(
-      await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS),
-    );
+    let state = normalize(await withTimeout(plugin.checkPermissions(), PERMISSION_TIMEOUT_MS));
     if (state !== "granted") {
       state = normalize(
         await withTimeout(
@@ -185,10 +177,7 @@ function browserPosition(): Promise<GeoResult> {
       window.clearTimeout(watchdog);
       resolve(result);
     };
-    const watchdog = window.setTimeout(
-      () => finish({ error: "timeout" }),
-      POSITION_TIMEOUT_MS,
-    );
+    const watchdog = window.setTimeout(() => finish({ error: "timeout" }), POSITION_TIMEOUT_MS);
     navigator.geolocation.getCurrentPosition(
       (pos) =>
         finish({

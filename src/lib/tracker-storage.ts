@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { isNativeApp, nativeGet, nativeSet } from "./native-store";
+import {
+  MONTHS_RU,
+  WEEKDAYS_RU,
+  isSameDay,
+  monthGrid,
+  parseISODate,
+  toISODate,
+} from "./date-utils";
 
+export { MONTHS_RU, WEEKDAYS_RU, isSameDay, monthGrid, parseISODate, toISODate };
 
 export type OrderStatus = "planned" | "in_progress" | "done" | "cancelled";
 
@@ -92,7 +101,6 @@ function write<T>(key: string, value: T) {
   }, 0);
 }
 
-
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -136,7 +144,6 @@ function useKey<T>(key: string, fallback: T) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { key: string } | undefined;
@@ -157,8 +164,7 @@ function useKey<T>(key: string, fallback: T) {
   const update = useCallback(
     (updater: T | ((prev: T) => T)) => {
       const base = hydrated.current ? ref.current : read(key, fallback);
-      const next =
-        typeof updater === "function" ? (updater as (p: T) => T)(base) : updater;
+      const next = typeof updater === "function" ? (updater as (p: T) => T)(base) : updater;
       ref.current = next;
       hydrated.current = true;
       write(key, next);
@@ -170,7 +176,6 @@ function useKey<T>(key: string, fallback: T) {
 
   return [value, update] as const;
 }
-
 
 export function useOrders() {
   return useKey<Order[]>(KEY_ORDERS, []);
@@ -203,7 +208,6 @@ export function orderTotal(o: { price?: number; delivery?: number }) {
 }
 
 export function formatMoney(n: number) {
-
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency: "RUB",
@@ -212,20 +216,13 @@ export function formatMoney(n: number) {
 }
 
 export function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ru-RU", {
+  const date = parseISODate(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "short",
     weekday: "short",
   });
-}
-
-export function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 /** Ставка ₽ за час по виду работ */
@@ -267,31 +264,4 @@ export function useYandexKey() {
 export function useGeocoderKey() {
   const [settings] = useSettings();
   return settings.yandexGeocoderKey?.trim() || DEFAULT_GEOCODER_KEY;
-}
-
-
-export const MONTHS_RU = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
-];
-
-export const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-
-export function toISODate(d: Date) {
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Сетка месяца: 6 недель по 7 дней, начиная с понедельника */
-export function monthGrid(year: number, month: number) {
-  const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7;
-  const start = new Date(year, month, 1 - offset);
-  return Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
-  });
 }

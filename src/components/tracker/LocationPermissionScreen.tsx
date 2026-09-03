@@ -6,36 +6,9 @@ import {
   geolocationSupported,
   getCurrentPosition,
 } from "@/lib/geo";
+import { useDialog } from "@/hooks/use-dialog";
 
-export type GeoConsent = "granted" | "declined";
-
-const CONSENT_KEY = "tracker:geo-consent";
-
-export function readGeoConsent(): GeoConsent | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const v = window.localStorage.getItem(CONSENT_KEY);
-    return v === "granted" || v === "declined" ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveGeoConsent(value: GeoConsent) {
-  try {
-    window.localStorage.setItem(CONSENT_KEY, value);
-  } catch {
-    /* хранилище недоступно — не критично */
-  }
-}
-
-export function clearGeoConsent() {
-  try {
-    window.localStorage.removeItem(CONSENT_KEY);
-  } catch {
-    /* игнорируем */
-  }
-}
+import { readGeoConsent, saveGeoConsent, type GeoConsent } from "@/lib/geo-consent";
 
 interface Props {
   /** Вызывается после решения пользователя (разрешил или отказался). */
@@ -51,6 +24,7 @@ export function LocationPermissionScreen({ onDone }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [denied, setDenied] = useState(false);
+  useDialog(true, cancel);
 
   useEffect(() => {
     void checkLocationPermission().then((state) => {
@@ -85,14 +59,25 @@ export function LocationPermissionScreen({ onDone }: Props) {
   const unsupported = !geolocationSupported();
 
   return (
-    <div className="fixed inset-0 z-50 bg-background text-foreground overflow-y-auto">
-      <div className="max-w-md mx-auto min-h-full flex flex-col justify-center px-5 py-10 space-y-6">
+    <div
+      className="fixed inset-0 z-50 bg-background text-foreground overflow-y-auto"
+      role="presentation"
+    >
+      <div
+        className="max-w-md mx-auto min-h-full flex flex-col justify-center px-5 py-10 space-y-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="geo-permission-title"
+      >
         <div className="size-16 rounded-2xl bg-primary/15 flex items-center justify-center">
           <MapPin className="size-8 text-primary" />
         </div>
 
         <div className="space-y-2">
-          <h1 className="font-display text-2xl uppercase tracking-wide leading-tight">
+          <h1
+            id="geo-permission-title"
+            className="font-display text-2xl uppercase tracking-wide leading-tight"
+          >
             Доступ к геолокации
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -109,15 +94,14 @@ export function LocationPermissionScreen({ onDone }: Props) {
             </li>
             <li className="flex gap-2">
               <ShieldCheck className="size-4 mt-0.5 text-primary shrink-0" />
-              координаты остаются на телефоне и никуда не отправляются.
+              координаты сохраняются в приложении и используются для работы с Яндекс.Картами.
             </li>
           </ul>
         </div>
 
         {unsupported && (
           <p className="text-sm text-muted-foreground">
-            Устройство не поддерживает определение местоположения — можно продолжить
-            без него.
+            Устройство не поддерживает определение местоположения — можно продолжить без него.
           </p>
         )}
 
@@ -128,8 +112,8 @@ export function LocationPermissionScreen({ onDone }: Props) {
               <p className="text-sm text-destructive">{error}</p>
               {denied && (
                 <p className="text-xs text-muted-foreground">
-                  Можно продолжить без геолокации — маршрут построится «от текущего
-                  места» силами Яндекс.Навигатора.
+                  Можно продолжить без геолокации — маршрут построится «от текущего места» силами
+                  Яндекс.Навигатора.
                 </p>
               )}
             </div>
@@ -143,11 +127,7 @@ export function LocationPermissionScreen({ onDone }: Props) {
             disabled={busy || unsupported}
             className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide inline-flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <MapPin className="size-4" />
-            )}
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
             {busy ? "Определяю..." : "Разрешить доступ"}
           </button>
           <button

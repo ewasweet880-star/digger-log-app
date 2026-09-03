@@ -8,9 +8,10 @@ async function request(apiKey: string, geocode: string) {
   const data = await res.json();
   const member = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
   if (!member) return null;
-  const [lng, lat] = String(member.Point?.pos ?? "").split(" ").map(Number);
-  const address: string =
-    member.metaDataProperty?.GeocoderMetaData?.text ?? member.name ?? "";
+  const [lng, lat] = String(member.Point?.pos ?? "")
+    .split(" ")
+    .map(Number);
+  const address: string = member.metaDataProperty?.GeocoderMetaData?.text ?? member.name ?? "";
   return { lat, lng, address };
 }
 

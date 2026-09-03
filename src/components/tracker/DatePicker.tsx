@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  MONTHS_RU,
-  WEEKDAYS_RU,
-  monthGrid,
-  toISODate,
-  isSameDay,
-} from "@/lib/tracker-storage";
+import { MONTHS_RU, WEEKDAYS_RU, monthGrid, toISODate, isSameDay } from "@/lib/tracker-storage";
 
 interface Props {
   value: string; // ISO yyyy-mm-dd
@@ -65,7 +59,7 @@ export function DatePicker({ value, onChange, busy = [] }: Props) {
             <button
               type="button"
               onClick={() => shift(-1)}
-              className="p-2 rounded-lg hover:bg-accent"
+              className="min-h-11 min-w-11 rounded-lg hover:bg-accent"
               aria-label="Предыдущий месяц"
             >
               <ChevronLeft className="size-5" />
@@ -76,7 +70,7 @@ export function DatePicker({ value, onChange, busy = [] }: Props) {
             <button
               type="button"
               onClick={() => shift(1)}
-              className="p-2 rounded-lg hover:bg-accent"
+              className="min-h-11 min-w-11 rounded-lg hover:bg-accent"
               aria-label="Следующий месяц"
             >
               <ChevronRight className="size-5" />
@@ -131,7 +125,7 @@ export function DatePicker({ value, onChange, busy = [] }: Props) {
               onChange(toISODate(new Date()));
               setOpen(false);
             }}
-            className="w-full mt-2 py-2 rounded-lg bg-secondary text-sm font-semibold"
+            className="w-full min-h-11 mt-2 rounded-lg bg-secondary text-sm font-semibold"
           >
             Сегодня
           </button>

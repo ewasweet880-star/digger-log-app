@@ -7,14 +7,15 @@ import {
   useSettings,
   uid,
   formatMoney,
-
   WORK_TYPES,
+  toISODate,
   type Order,
   type OrderStatus,
 } from "@/lib/tracker-storage";
 import { DatePicker } from "./DatePicker";
 import { YandexMap } from "./YandexMap";
-import { Map as MapIcon, X } from "lucide-react";
+import { ChevronDown, Map as MapIcon, X } from "lucide-react";
+import { useDialog } from "@/hooks/use-dialog";
 
 interface Props {
   onClose: () => void;
@@ -38,9 +39,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
     lng: editing?.lng,
   });
   const [showMap, setShowMap] = useState(editing?.lat != null);
-  const [date, setDate] = useState(
-    editing?.date ?? defaultDate ?? new Date().toISOString().slice(0, 10),
-  );
+  const [date, setDate] = useState(editing?.date ?? defaultDate ?? toISODate(new Date()));
   const [hours, setHours] = useState(editing?.hours?.toString() ?? "");
   const [price, setPrice] = useState(editing?.price?.toString() ?? "");
   const [delivery, setDelivery] = useState(editing?.delivery?.toString() ?? "");
@@ -49,6 +48,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [status, setStatus] = useState<OrderStatus>(editing?.status ?? "planned");
   const [paid, setPaid] = useState(editing?.paid ?? false);
   const [notes, setNotes] = useState(editing?.notes ?? "");
+  const [showDetails, setShowDetails] = useState(Boolean(editing));
+  useDialog(true, onClose);
 
   const rate = rates[workType];
   const shiftRate = shiftRates[workType];
@@ -77,31 +78,52 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
     else if (s && !h) setPrice(String(Math.round(s)));
   }
 
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!clientName.trim()) return;
 
     // upsert client
     let clientId = editing?.clientId;
+    const cleanClientName = clientName.trim();
     const existing = clients.find(
-      (c) => c.name.trim().toLowerCase() === clientName.trim().toLowerCase(),
+      (client) => client.name.trim().toLowerCase() === cleanClientName.toLowerCase(),
     );
+    const currentClient = editing?.clientId
+      ? clients.find((client) => client.id === editing.clientId)
+      : undefined;
+
     if (existing) {
       clientId = existing.id;
       if (clientPhone && existing.phone !== clientPhone) {
         setClients((prev) =>
-          prev.map((c) => (c.id === existing.id ? { ...c, phone: clientPhone } : c)),
+          prev.map((client) =>
+            client.id === existing.id ? { ...client, phone: clientPhone.trim() } : client,
+          ),
         );
       }
+    } else if (currentClient) {
+      // Editing an order and changing its client name should rename the linked
+      // client instead of leaving an orphaned duplicate in the client list.
+      clientId = currentClient.id;
+      setClients((prev) =>
+        prev.map((client) =>
+          client.id === currentClient.id
+            ? {
+                ...client,
+                name: cleanClientName,
+                phone: clientPhone.trim() || client.phone,
+              }
+            : client,
+        ),
+      );
     } else {
       clientId = uid();
       setClients((prev) => [
         ...prev,
         {
           id: clientId!,
-          name: clientName.trim(),
-          phone: clientPhone || undefined,
+          name: cleanClientName,
+          phone: clientPhone.trim() || undefined,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -134,21 +156,28 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+      role="presentation"
+    >
       <form
         onSubmit={submit}
         className="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-card border-t sm:border border-border shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="order-form-title"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border bg-card">
-          <h2 className="font-display text-xl uppercase tracking-wide">
+          <h2 id="order-form-title" className="font-display text-xl uppercase tracking-wide">
             {editing ? "Редактировать" : "Новый заказ"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-accent"
+            className="min-h-11 min-w-11 rounded-lg hover:bg-accent"
+            aria-label="Закрыть заказ"
           >
-            <X className="size-5" />
+            <X className="mx-auto size-5" />
           </button>
         </div>
 
@@ -157,7 +186,14 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             <input
               required
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                setClientName(nextName);
+                const savedClient = clients.find(
+                  (client) => client.name.toLowerCase() === nextName.trim().toLowerCase(),
+                );
+                if (savedClient) setClientPhone(savedClient.phone ?? "");
+              }}
               list="clients-list"
               className="input"
               placeholder="Имя клиента"
@@ -169,15 +205,30 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </datalist>
           </Field>
 
-          <Field label="Телефон">
-            <input
-              type="tel"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              className="input"
-              placeholder="+7 ..."
+          <button
+            type="button"
+            onClick={() => setShowDetails((value) => !value)}
+            aria-expanded={showDetails}
+            className="w-full min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+          >
+            <ChevronDown
+              className={`size-4 transition-transform ${showDetails ? "rotate-180" : ""}`}
             />
-          </Field>
+            {showDetails ? "Скрыть дополнительные поля" : "Дополнительные поля"}
+          </button>
+
+          {showDetails && (
+            <Field label="Телефон">
+              <input
+                type="tel"
+                inputMode="tel"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                className="input"
+                placeholder="+7 ..."
+              />
+            </Field>
+          )}
 
           <Field label="Вид работ">
             <select
@@ -205,25 +256,29 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             />
           </Field>
 
-          <button
-            type="button"
-            onClick={() => setShowMap((s) => !s)}
-            className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
-          >
-            <MapIcon className="size-4" />
-            {showMap ? "Скрыть карту" : "Отметить на карте"}
-          </button>
+          {showDetails && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowMap((value) => !value)}
+                className="w-full min-h-11 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+              >
+                <MapIcon className="size-4" />
+                {showMap ? "Скрыть карту" : "Отметить на карте"}
+              </button>
 
-          {showMap && (
-            <YandexMap
-              lat={coords.lat}
-              lng={coords.lng}
-              address={location}
-              onPick={(lat, lng, addr) => {
-                setCoords({ lat, lng });
-                if (addr) setLocation(addr);
-              }}
-            />
+              {showMap && (
+                <YandexMap
+                  lat={coords.lat}
+                  lng={coords.lng}
+                  address={location}
+                  onPick={(lat, lng, addr) => {
+                    setCoords({ lat, lng });
+                    if (addr) setLocation(addr);
+                  }}
+                />
+              )}
+            </>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -233,6 +288,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             <Field label="Часы">
               <input
                 type="number"
+                inputMode="decimal"
                 min="0"
                 step="0.5"
                 value={hours}
@@ -249,6 +305,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
           <Field label="Сумма за работу, ₽">
             <input
               type="number"
+              inputMode="decimal"
               min="0"
               value={price}
               onChange={(e) => {
@@ -284,17 +341,6 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </p>
           ) : null}
 
-          <Field label="Доставка техники, ₽">
-            <input
-              type="number"
-              min="0"
-              value={delivery}
-              onChange={(e) => setDelivery(e.target.value)}
-              className="input"
-              placeholder="0"
-            />
-          </Field>
-
           <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2.5">
             <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
               Итого
@@ -304,51 +350,66 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
             </span>
           </div>
 
+          {showDetails && (
+            <>
+              <Field label="Доставка техники, ₽">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  value={delivery}
+                  onChange={(e) => setDelivery(e.target.value)}
+                  className="input"
+                  placeholder="0"
+                />
+              </Field>
 
-          <Field label="Статус">
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  ["planned", "Запланирован"],
-                  ["in_progress", "В работе"],
-                  ["done", "Выполнен"],
-                  ["cancelled", "Отменён"],
-                ] as [OrderStatus, string][]
-              ).map(([v, l]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setStatus(v)}
-                  className={`py-2 rounded-lg text-sm font-medium border transition ${
-                    status === v
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary border-border text-foreground"
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </Field>
+              <Field label="Статус">
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["planned", "Запланирован"],
+                      ["in_progress", "В работе"],
+                      ["done", "Выполнен"],
+                      ["cancelled", "Отменён"],
+                    ] as [OrderStatus, string][]
+                  ).map(([v, l]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setStatus(v)}
+                      className={`min-h-11 rounded-lg text-sm font-medium border transition ${
+                        status === v
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary border-border text-foreground"
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </Field>
 
-          <label className="flex items-center gap-3 p-3 rounded-lg bg-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={paid}
-              onChange={(e) => setPaid(e.target.checked)}
-              className="size-5 accent-primary"
-            />
-            <span className="font-medium">Оплачено</span>
-          </label>
+              <label className="flex items-center gap-3 p-3 rounded-lg bg-secondary cursor-pointer min-h-12">
+                <input
+                  type="checkbox"
+                  checked={paid}
+                  onChange={(e) => setPaid(e.target.checked)}
+                  className="size-5 accent-primary"
+                />
+                <span className="font-medium">Оплачено</span>
+              </label>
 
-          <Field label="Заметки">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="input min-h-20"
-              placeholder="Дополнительно..."
-            />
-          </Field>
+              <Field label="Заметки">
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="input min-h-20"
+                  placeholder="Дополнительно..."
+                />
+              </Field>
+            </>
+          )}
         </div>
 
         <div className="sticky bottom-0 p-4 bg-card border-t border-border flex gap-2">
@@ -361,9 +422,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
           </button>
           <button
             type="submit"
-            className="flex-[2] py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide"
+            className="flex-[2] min-h-12 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide"
           >
-            Сохранить
+            {editing ? "Сохранить" : "Добавить заказ"}
           </button>
         </div>
       </form>

@@ -19,10 +19,7 @@ export interface StartPoint {
 }
 
 export function canNavigate(o: RouteTarget) {
-  return (
-    (typeof o.lat === "number" && typeof o.lng === "number") ||
-    Boolean(o.location?.trim())
-  );
+  return (typeof o.lat === "number" && typeof o.lng === "number") || Boolean(o.location?.trim());
 }
 
 export { geolocationSupported };
@@ -32,7 +29,6 @@ export async function requestCurrentPosition(): Promise<StartPoint | null> {
   const { point } = await getCurrentPosition();
   return point ? { lat: point.lat, lng: point.lng } : null;
 }
-
 
 function webUrl(o: RouteTarget, from?: StartPoint | null) {
   const start = from ? `${from.lat},${from.lng}` : "";

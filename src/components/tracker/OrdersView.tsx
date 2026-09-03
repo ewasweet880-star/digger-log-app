@@ -3,9 +3,9 @@ import {
   useOrders,
   formatMoney,
   orderTotal,
-
   formatDate,
   isSameDay,
+  parseISODate,
   type Order,
   type OrderStatus,
 } from "@/lib/tracker-storage";
@@ -30,6 +30,7 @@ import {
   type StartPoint,
 } from "@/lib/navigate";
 import { RouteStartDialog } from "./RouteStartDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 const GEO_OK_KEY = "tracker.geoAllowed";
 
@@ -50,6 +51,7 @@ export function OrdersView() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Order | undefined>();
   const [filter, setFilter] = useState<Filter>("today");
+  const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -59,8 +61,8 @@ export function OrdersView() {
     now.setHours(0, 0, 0, 0);
     const filtered = orders
       .filter((o) => {
-        const d = new Date(o.date);
-        d.setHours(0, 0, 0, 0);
+        const d = parseISODate(o.date);
+        if (Number.isNaN(d.getTime())) return false;
         if (filter === "today") return isSameDay(d, now);
         if (filter === "upcoming") return d.getTime() > now.getTime() && o.status !== "cancelled";
         if (filter === "done") return o.status === "done";
@@ -77,14 +79,19 @@ export function OrdersView() {
   }, [orders, filter]);
 
   const todayCount = orders.filter((o) => {
-    const d = new Date(o.date);
-    d.setHours(0, 0, 0, 0);
-    return isSameDay(d, today);
+    const d = parseISODate(o.date);
+    return !Number.isNaN(d.getTime()) && isSameDay(d, today);
   }).length;
 
   function removeOrder(id: string) {
-    if (!confirm("Удалить заказ?")) return;
-    setOrders((prev) => prev.filter((o) => o.id !== id));
+    const order = orders.find((item) => item.id === id);
+    if (order) setPendingDelete(order);
+  }
+
+  function confirmRemoveOrder() {
+    if (!pendingDelete) return;
+    setOrders((prev) => prev.filter((o) => o.id !== pendingDelete.id));
+    setPendingDelete(null);
   }
 
   return (
@@ -161,6 +168,15 @@ export function OrdersView() {
           }}
         />
       )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Удалить заказ?"
+          description={`${pendingDelete.workType} · ${pendingDelete.clientName}. Заказ нельзя будет восстановить.`}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmRemoveOrder}
+        />
+      )}
     </div>
   );
 }
@@ -205,9 +221,7 @@ function OrderCard({
               {meta.label}
             </span>
           </div>
-          <div className="font-display text-lg leading-tight truncate">
-            {order.workType}
-          </div>
+          <div className="font-display text-lg leading-tight truncate">{order.workType}</div>
           <div className="text-sm text-muted-foreground truncate">{order.clientName}</div>
         </div>
         <div className="text-right shrink-0">
@@ -253,40 +267,35 @@ function OrderCard({
       )}
 
       {order.notes && (
-        <p className="text-sm text-muted-foreground border-l-2 border-border pl-2">
-          {order.notes}
-        </p>
+        <p className="text-sm text-muted-foreground border-l-2 border-border pl-2">{order.notes}</p>
       )}
 
       <div className="flex gap-2 pt-1">
         {canNavigate(order) && (
           <button
             onClick={route}
-            className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
+            className="flex-1 min-h-11 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
           >
             <Navigation className="size-4" /> Маршрут
           </button>
         )}
         <button
           onClick={onEdit}
-          className="flex-1 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium inline-flex items-center justify-center gap-1"
+          className="flex-1 min-h-11 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium inline-flex items-center justify-center gap-1"
         >
           <Pencil className="size-4" /> Изменить
         </button>
         <button
           onClick={onDelete}
-          className="px-3 py-2 rounded-lg bg-secondary text-destructive text-sm"
+          className="min-h-11 min-w-11 rounded-lg bg-secondary text-destructive text-sm"
           aria-label="Удалить"
         >
           <Trash2 className="size-4" />
         </button>
       </div>
 
-      {askGeo && (
-        <RouteStartDialog onCancel={() => setAskGeo(false)} onReady={finish} />
-      )}
+      {askGeo && <RouteStartDialog onCancel={() => setAskGeo(false)} onReady={finish} />}
     </div>
-
   );
 }
 
@@ -295,9 +304,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     <div className="px-6 py-20 text-center">
       <div className="mx-auto size-24 rounded-full stripe-tape opacity-40 mb-6" />
       <h3 className="font-display text-2xl uppercase mb-2">Пусто</h3>
-      <p className="text-muted-foreground mb-6">
-        Здесь появятся заказы. Добавьте первый.
-      </p>
+      <p className="text-muted-foreground mb-6">Здесь появятся заказы. Добавьте первый.</p>
       <button
         onClick={onAdd}
         className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide"

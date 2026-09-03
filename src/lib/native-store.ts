@@ -14,12 +14,12 @@ type PrefsApi = {
 
 export function isNativeApp() {
   if (typeof window === "undefined") return false;
-  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
-    .Capacitor;
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
   return Boolean(cap?.isNativePlatform?.());
 }
 
 let prefsPromise: Promise<PrefsApi | null> | null = null;
+const pendingWrites = new Map<string, Promise<void>>();
 
 function getPrefs(): Promise<PrefsApi | null> {
   if (!isNativeApp()) return Promise.resolve(null);
@@ -43,13 +43,20 @@ export async function nativeGet(key: string): Promise<string | null> {
 }
 
 export function nativeSet(key: string, value: string) {
-  void (async () => {
-    try {
-      const prefs = await getPrefs();
-      if (!prefs) return;
-      await prefs.set({ key, value });
-    } catch (err) {
-      console.error("Не удалось сохранить в память телефона", err);
-    }
-  })();
+  const previous = pendingWrites.get(key) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        const prefs = await getPrefs();
+        if (prefs) await prefs.set({ key, value });
+      } catch (err) {
+        console.error("Не удалось сохранить в память телефона", err);
+      }
+    });
+
+  pendingWrites.set(key, current);
+  void current.finally(() => {
+    if (pendingWrites.get(key) === current) pendingWrites.delete(key);
+  });
 }

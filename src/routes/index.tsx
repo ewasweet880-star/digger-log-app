@@ -7,11 +7,8 @@ import { ClientsView } from "@/components/tracker/ClientsView";
 import { EarningsView } from "@/components/tracker/EarningsView";
 import { ExpensesView } from "@/components/tracker/ExpensesView";
 import { SettingsView } from "@/components/tracker/SettingsView";
-import {
-  LocationPermissionScreen,
-  readGeoConsent,
-} from "@/components/tracker/LocationPermissionScreen";
-
+import { LocationPermissionScreen } from "@/components/tracker/LocationPermissionScreen";
+import { readGeoConsent } from "@/lib/geo-consent";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,13 +52,11 @@ function App() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-display text-2xl uppercase leading-none">Смена</div>
-          <div className="text-xs text-muted-foreground">
-            {tabLabel(tab)}
-          </div>
+          <div className="text-xs text-muted-foreground">{tabLabel(tab)}</div>
         </div>
         <button
           onClick={() => setSettingsOpen(true)}
-          className="p-2 rounded-xl bg-secondary text-secondary-foreground"
+          className="min-h-11 min-w-11 rounded-xl bg-secondary text-secondary-foreground"
           aria-label="Настройки"
         >
           <Settings className="size-5" />
@@ -120,8 +115,6 @@ function App() {
         </div>
         <div className="h-[env(safe-area-inset-bottom)]" />
       </nav>
-
-
 
       <style>{`
         .input {

@@ -12,6 +12,7 @@ import {
 } from "@/lib/tracker-storage";
 import { OrderForm } from "./OrderForm";
 import { ChevronLeft, ChevronRight, MapPin, Plus } from "lucide-react";
+import { getMonthRange, isDateInRange } from "@/lib/date-utils";
 
 export function CalendarView() {
   const [orders] = useOrders();
@@ -33,21 +34,25 @@ export function CalendarView() {
   const today = new Date();
   const dayOrders = byDate.get(selected) ?? [];
 
-  const monthTotal = useMemo(
-    () =>
-      orders
-        .filter(
-          (o) =>
-            o.status !== "cancelled" &&
-            new Date(`${o.date}T00:00:00`).getMonth() === view.getMonth() &&
-            new Date(`${o.date}T00:00:00`).getFullYear() === view.getFullYear(),
-        )
-        .reduce((s, o) => s + orderTotal(o), 0),
-    [orders, view],
-  );
+  const monthTotal = useMemo(() => {
+    const { start, endExclusive } = getMonthRange(view);
+    return orders
+      .filter(
+        (order) => isDateInRange(order.date, start, endExclusive) && order.status !== "cancelled",
+      )
+      .reduce((sum, order) => sum + orderTotal(order), 0);
+  }, [orders, view]);
 
   function shift(delta: number) {
-    setView((v) => new Date(v.getFullYear(), v.getMonth() + delta, 1));
+    const next = new Date(view.getFullYear(), view.getMonth() + delta, 1);
+    setView(next);
+    setSelected(toISODate(next));
+  }
+
+  function goToday() {
+    const now = new Date();
+    setView(now);
+    setSelected(toISODate(now));
   }
 
   return (
@@ -56,8 +61,9 @@ export function CalendarView() {
         <div className="bg-card border border-border rounded-2xl p-3">
           <div className="flex items-center justify-between mb-3">
             <button
+              type="button"
               onClick={() => shift(-1)}
-              className="p-2 rounded-lg hover:bg-accent"
+              className="min-h-11 min-w-11 rounded-lg hover:bg-accent"
               aria-label="Предыдущий месяц"
             >
               <ChevronLeft className="size-5" />
@@ -71,8 +77,16 @@ export function CalendarView() {
               </div>
             </div>
             <button
+              type="button"
+              onClick={goToday}
+              className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-accent"
+            >
+              Сегодня
+            </button>
+            <button
+              type="button"
               onClick={() => shift(1)}
-              className="p-2 rounded-lg hover:bg-accent"
+              className="min-h-11 min-w-11 rounded-lg hover:bg-accent"
               aria-label="Следующий месяц"
             >
               <ChevronRight className="size-5" />
@@ -136,9 +150,7 @@ export function CalendarView() {
         </h3>
 
         {dayOrders.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-1 py-4">
-            На этот день заказов нет.
-          </p>
+          <p className="text-sm text-muted-foreground px-1 py-4">На этот день заказов нет.</p>
         ) : (
           dayOrders.map((o) => (
             <button
@@ -161,9 +173,7 @@ export function CalendarView() {
                   ) : null}
                 </div>
               </div>
-              <div className="font-display text-primary shrink-0">
-                {formatMoney(orderTotal(o))}
-              </div>
+              <div className="font-display text-primary shrink-0">{formatMoney(orderTotal(o))}</div>
             </button>
           ))
         )}

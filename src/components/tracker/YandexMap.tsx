@@ -4,28 +4,71 @@ import { forwardGeocode, reverseGeocode } from "@/lib/yandex-geocode";
 import { Crosshair, Loader2, LocateFixed, Search } from "lucide-react";
 import { GEO_ERROR_TEXT, geolocationSupported, getCurrentPosition } from "@/lib/geo";
 
+interface YandexEvent {
+  get(name: string): number[];
+}
+
+interface YandexEventManager {
+  add(name: string, handler: (event: YandexEvent) => void): void;
+}
+
+interface YandexGeometry {
+  getCoordinates(): number[];
+  setCoordinates(coords: number[]): void;
+}
+
+interface YandexPlacemark {
+  geometry: YandexGeometry;
+  events: YandexEventManager;
+}
+
+interface YandexMapInstance {
+  events: YandexEventManager;
+  geoObjects: { add(object: YandexPlacemark): void };
+  setCenter(coords: number[], zoom: number): void;
+  destroy(): void;
+}
+
+interface YandexMapsApi {
+  ready(callback: () => void): void;
+  Map: new (
+    element: HTMLElement,
+    state: { center: number[]; zoom: number; controls: string[] },
+    options: { suppressMapOpenBlock: boolean },
+  ) => YandexMapInstance;
+  Placemark: new (
+    coords: number[],
+    properties: Record<string, never>,
+    options: { draggable: boolean; preset: string },
+  ) => YandexPlacemark;
+}
 
 declare global {
   interface Window {
-    ymaps?: any;
+    ymaps?: YandexMapsApi;
   }
 }
 
-let loaderPromise: Promise<any> | null = null;
+let loaderPromise: Promise<YandexMapsApi> | null = null;
 
-function loadYmaps(apiKey: string) {
+function loadYmaps(apiKey: string): Promise<YandexMapsApi> {
   if (loaderPromise) return loaderPromise;
-  loaderPromise = new Promise((resolve, reject) => {
+  loaderPromise = new Promise<YandexMapsApi>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(
-      apiKey,
-    )}&lang=ru_RU`;
+    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(apiKey)}&lang=ru_RU`;
     script.async = true;
     script.onerror = () => {
       loaderPromise = null;
       reject(new Error("Не удалось загрузить Яндекс.Карты"));
     };
-    script.onload = () => window.ymaps.ready(() => resolve(window.ymaps));
+    script.onload = () => {
+      if (!window.ymaps) {
+        loaderPromise = null;
+        reject(new Error("Яндекс.Карты не инициализировались"));
+        return;
+      }
+      window.ymaps.ready(() => resolve(window.ymaps!));
+    };
     document.head.appendChild(script);
   });
   return loaderPromise;
@@ -44,14 +87,13 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
   const apiKey = useYandexKey();
   const geocoderKey = useGeocoderKey();
   const boxRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markRef = useRef<any>(null);
-  const ymapsRef = useRef<any>(null);
+  const mapRef = useRef<YandexMapInstance | null>(null);
+  const markRef = useRef<YandexPlacemark | null>(null);
+  const ymapsRef = useRef<YandexMapsApi | null>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
   const geoKeyRef = useRef(geocoderKey);
   geoKeyRef.current = geocoderKey;
-
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,19 +123,21 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         mapRef.current = map;
 
         const place = (coords: number[], reverse = true) => {
-          if (!markRef.current) {
-            markRef.current = new ymaps.Placemark(
+          const currentMark = markRef.current;
+          if (!currentMark) {
+            const newMark = new ymaps.Placemark(
               coords,
               {},
               { draggable: true, preset: "islands#orangeDotIcon" },
             );
-            markRef.current.events.add("dragend", () => {
-              const c = markRef.current.geometry.getCoordinates();
-              resolveAddress(c);
+            markRef.current = newMark;
+            newMark.events.add("dragend", () => {
+              const current = markRef.current;
+              if (current) resolveAddress(current.geometry.getCoordinates());
             });
-            map.geoObjects.add(markRef.current);
+            map.geoObjects.add(newMark);
           } else {
-            markRef.current.geometry.setCoordinates(coords);
+            currentMark.geometry.setCoordinates(coords);
           }
           if (reverse) resolveAddress(coords);
         };
@@ -107,8 +151,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
             .catch(() => undefined);
         };
 
-
-        map.events.add("click", (e: any) => place(e.get("coords")));
+        map.events.add("click", (event) => place(event.get("coords")));
         if (lat != null && lng != null) place([lat, lng], false);
         setLoading(false);
       })
@@ -136,24 +179,29 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
   /** Ставит/двигает метку и сообщает координаты наверх. */
   function putMarker(coords: number[], zoom = 16) {
     const ymaps = ymapsRef.current;
-    if (!ymaps || !mapRef.current) return;
-    mapRef.current.setCenter(coords, zoom);
-    if (!markRef.current) {
-      markRef.current = new ymaps.Placemark(
+    const map = mapRef.current;
+    if (!ymaps || !map) return;
+    map.setCenter(coords, zoom);
+    const currentMark = markRef.current;
+    if (!currentMark) {
+      const newMark = new ymaps.Placemark(
         coords,
         {},
         { draggable: true, preset: "islands#orangeDotIcon" },
       );
-      markRef.current.events.add("dragend", () => {
-        const c = markRef.current.geometry.getCoordinates();
-        onPickRef.current(c[0], c[1]);
-        reverseGeocode(geoKeyRef.current, c[0], c[1])
-          .then((rr) => onPickRef.current(c[0], c[1], rr?.address || undefined))
+      markRef.current = newMark;
+      newMark.events.add("dragend", () => {
+        const current = markRef.current;
+        if (!current) return;
+        const nextCoords = current.geometry.getCoordinates();
+        onPickRef.current(nextCoords[0], nextCoords[1]);
+        reverseGeocode(geoKeyRef.current, nextCoords[0], nextCoords[1])
+          .then((rr) => onPickRef.current(nextCoords[0], nextCoords[1], rr?.address || undefined))
           .catch(() => undefined);
       });
-      mapRef.current.geoObjects.add(markRef.current);
+      map.geoObjects.add(newMark);
     } else {
-      markRef.current.geometry.setCoordinates(coords);
+      currentMark.geometry.setCoordinates(coords);
     }
   }
 
@@ -169,9 +217,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
     }
     putMarker([point.lat, point.lng], 17);
     onPickRef.current(point.lat, point.lng);
-    const r = await reverseGeocode(geoKeyRef.current, point.lat, point.lng).catch(
-      () => null,
-    );
+    const r = await reverseGeocode(geoKeyRef.current, point.lat, point.lng).catch(() => null);
     onPickRef.current(point.lat, point.lng, r?.address || undefined);
   }
 
@@ -182,38 +228,43 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
     if (!ymaps || !mapRef.current || !text) return;
 
     forwardGeocode(geoKeyRef.current, text)
-      .then((r) => {
-        if (!r || Number.isNaN(r.lat)) return;
-        const coords = [r.lat, r.lng];
-        mapRef.current.setCenter(coords, 16);
-        if (!markRef.current) {
-          markRef.current = new ymaps.Placemark(
+      .then((result) => {
+        const map = mapRef.current;
+        if (!result || Number.isNaN(result.lat) || !map) return;
+        const coords = [result.lat, result.lng];
+        map.setCenter(coords, 16);
+        const currentMark = markRef.current;
+        if (!currentMark) {
+          const newMark = new ymaps.Placemark(
             coords,
             {},
             { draggable: true, preset: "islands#orangeDotIcon" },
           );
-          markRef.current.events.add("dragend", () => {
-            const c = markRef.current.geometry.getCoordinates();
-            onPickRef.current(c[0], c[1]);
-            reverseGeocode(geoKeyRef.current, c[0], c[1])
-              .then((rr) => onPickRef.current(c[0], c[1], rr?.address || undefined))
+          markRef.current = newMark;
+          newMark.events.add("dragend", () => {
+            const current = markRef.current;
+            if (!current) return;
+            const nextCoords = current.geometry.getCoordinates();
+            onPickRef.current(nextCoords[0], nextCoords[1]);
+            reverseGeocode(geoKeyRef.current, nextCoords[0], nextCoords[1])
+              .then((rr) =>
+                onPickRef.current(nextCoords[0], nextCoords[1], rr?.address || undefined),
+              )
               .catch(() => undefined);
           });
-          mapRef.current.geoObjects.add(markRef.current);
+          map.geoObjects.add(newMark);
         } else {
-          markRef.current.geometry.setCoordinates(coords);
+          currentMark.geometry.setCoordinates(coords);
         }
-        onPickRef.current(r.lat, r.lng, r.address || undefined);
+        onPickRef.current(result.lat, result.lng, result.address || undefined);
       })
       .catch(() => setError("Не удалось найти адрес"));
-
   }
 
   if (!apiKey) {
     return (
       <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-        Чтобы показывать карту, добавьте бесплатный API-ключ Яндекс.Карт в разделе
-        «Настройки».
+        Чтобы показывать карту, добавьте бесплатный API-ключ Яндекс.Карт в разделе «Настройки».
         {lat != null && lng != null && (
           <a
             className="block mt-2 text-primary font-semibold"
@@ -243,7 +294,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         <button
           type="button"
           onClick={search}
-          className="px-4 rounded-xl bg-secondary text-secondary-foreground"
+          className="min-h-11 min-w-11 rounded-xl bg-secondary text-secondary-foreground"
           aria-label="Найти"
         >
           <Search className="size-5" />
@@ -254,7 +305,7 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
         type="button"
         onClick={locate}
         disabled={locating || !geolocationSupported()}
-        className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
+        className="w-full min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {locating ? (
           <Loader2 className="size-4 animate-spin" />
@@ -279,7 +330,6 @@ export function YandexMap({ lat, lng, address, onPick }: Props) {
           </div>
         )}
       </div>
-
 
       <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
         <Crosshair className="size-3.5" />
