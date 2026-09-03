@@ -166,7 +166,7 @@ export function SettingsView({
     else onClose();
   });
 
-  function exportBackup() {
+  async function exportBackup() {
     const backup = createBackup({
       orders,
       clients,
@@ -175,13 +175,31 @@ export function SettingsView({
       shiftRates,
       settings,
     });
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {
-      type: "application/json",
-    });
+    const filename = `smena-backup-${toISODate(new Date())}.json`;
+    const json = JSON.stringify(backup, null, 2);
+    const file = new File([json], filename, { type: "application/json" });
+
+    // On Android, sharing a file is more reliable than relying on the WebView
+    // download handler. Browsers without file sharing use the normal download.
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: "Резервная копия «Смена»",
+          files: [file],
+        });
+        setBackupError(null);
+        setBackupMessage("Резервная копия отправлена в меню «Поделиться».");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `smena-backup-${toISODate(new Date())}.json`;
+    link.download = filename;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
     setBackupError(null);
