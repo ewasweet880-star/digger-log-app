@@ -9,6 +9,16 @@ import { ExpensesView } from "@/components/tracker/ExpensesView";
 import { SettingsView } from "@/components/tracker/SettingsView";
 import { LocationPermissionScreen } from "@/components/tracker/LocationPermissionScreen";
 import { readGeoConsent } from "@/lib/geo-consent";
+import {
+  useClients,
+  useExpenses,
+  useOrders,
+  useRates,
+  useSettings,
+  useShiftRates,
+} from "@/lib/tracker-storage";
+import { useAutoBackup } from "@/lib/auto-backup";
+import { registerOfflineSupport, useOnlineStatus } from "@/lib/offline";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,10 +44,23 @@ export const Route = createFileRoute("/")({
 
 type Tab = "orders" | "calendar" | "clients" | "expenses" | "money";
 
-function App() {
+export function App() {
   const [tab, setTab] = useState<Tab>("orders");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [geoScreen, setGeoScreen] = useState(false);
+  const [orders] = useOrders();
+  const [clients] = useClients();
+  const [expenses] = useExpenses();
+  const [rates] = useRates();
+  const [shiftRates] = useShiftRates();
+  const [settings] = useSettings();
+  const online = useOnlineStatus();
+
+  useAutoBackup({ orders, clients, expenses, rates, shiftRates, settings });
+
+  useEffect(() => {
+    registerOfflineSupport();
+  }, []);
 
   // При первом запуске спрашиваем разрешение; отказ запоминается.
   useEffect(() => {
@@ -62,6 +85,13 @@ function App() {
           <Settings className="size-5" />
         </button>
       </header>
+
+      {!online && (
+        <div className="mx-3 mb-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-foreground">
+          Нет интернета — приложение продолжает работать офлайн. Изменения сохраняются на
+          устройстве.
+        </div>
+      )}
 
       <main>
         {tab === "orders" && <OrdersView />}

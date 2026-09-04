@@ -24,6 +24,9 @@ export interface Order {
   hours?: number;
   /** Фактическая длительность между действиями «Начал» и «Завершил». */
   actualHours?: number;
+  /** Идентификаторы фотографий и голосовых заметок в IndexedDB. */
+  photoIds?: string[];
+  voiceNoteIds?: string[];
   price: number; // сумма за работу, ₽
   /** Стоимость доставки/подачи техники, ₽ */
   delivery?: number;
@@ -38,6 +41,8 @@ export interface Order {
   createdAt: string;
   lat?: number;
   lng?: number;
+  /** Время последнего изменения для двустороннего объединения. */
+  updatedAt?: string;
 }
 
 export interface Client {
@@ -46,6 +51,7 @@ export interface Client {
   phone?: string;
   note?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type ExpenseCategory = "fuel" | "service" | "parts" | "other";
@@ -60,6 +66,7 @@ export interface Expense {
   note?: string;
   orderId?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [

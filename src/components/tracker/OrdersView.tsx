@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   BadgeCheck,
+  CalendarPlus,
   CheckCircle2,
   CircleDashed,
   Clock,
@@ -36,6 +37,9 @@ import {
 } from "@/lib/navigate";
 import { RouteStartDialog } from "./RouteStartDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { OrderAttachmentList } from "./OrderAttachments";
+import { attachmentIds, deleteAttachments } from "@/lib/attachments";
+import { createCalendarEvent, downloadFile } from "@/lib/integrations";
 
 const GEO_OK_KEY = "tracker.geoAllowed";
 
@@ -91,8 +95,9 @@ export function OrdersView() {
   }, [orders, filter]);
 
   function updateOrder(id: string, patch: Partial<Order>) {
+    const updatedAt = new Date().toISOString();
     setOrders((previous) =>
-      previous.map((order) => (order.id === id ? { ...order, ...patch } : order)),
+      previous.map((order) => (order.id === id ? { ...order, ...patch, updatedAt } : order)),
     );
   }
 
@@ -126,6 +131,7 @@ export function OrdersView() {
   function confirmRemoveOrder() {
     if (!pendingDelete) return;
     setOrders((previous) => previous.filter((order) => order.id !== pendingDelete.id));
+    void deleteAttachments(attachmentIds(pendingDelete.photoIds, pendingDelete.voiceNoteIds));
     setPendingDelete(null);
   }
 
@@ -374,6 +380,14 @@ function OrderCard({
     openNavigator(order, from);
   }
 
+  function addToCalendar() {
+    downloadFile(
+      createCalendarEvent(order),
+      `smena-${order.date}-${order.id}.ics`,
+      "text/calendar;charset=utf-8",
+    );
+  }
+
   return (
     <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -440,6 +454,8 @@ function OrderCard({
         <p className="text-sm text-muted-foreground border-l-2 border-border pl-2">{order.notes}</p>
       )}
 
+      <OrderAttachmentList photoIds={order.photoIds} voiceNoteIds={order.voiceNoteIds} />
+
       {order.status === "planned" && (
         <button
           type="button"
@@ -465,6 +481,16 @@ function OrderCard({
           className="w-full min-h-12 rounded-xl bg-[color:var(--success)] text-primary-foreground font-bold inline-flex items-center justify-center gap-2"
         >
           <BadgeCheck className="size-4" /> Оплачено
+        </button>
+      )}
+
+      {order.status !== "cancelled" && (
+        <button
+          type="button"
+          onClick={addToCalendar}
+          className="w-full min-h-10 rounded-xl border border-border text-sm font-semibold inline-flex items-center justify-center gap-2"
+        >
+          <CalendarPlus className="size-4" /> Добавить в календарь
         </button>
       )}
 

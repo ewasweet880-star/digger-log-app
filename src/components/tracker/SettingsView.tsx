@@ -10,7 +10,10 @@ import {
   useShiftRates,
   WORK_TYPES,
 } from "@/lib/tracker-storage";
-import { createBackup, parseBackup, type BackupData } from "@/lib/backup";
+import { createCompleteBackup, parseBackup, type BackupData } from "@/lib/backup";
+import { mergeAttachmentExports, replaceAttachments } from "@/lib/attachments";
+import { createSyncPackage, mergeSyncData, parseSyncPackage, type SyncPackage } from "@/lib/sync";
+import { restoreLatestAutomaticBackup, useLatestAutomaticBackup } from "@/lib/auto-backup";
 import { toISODate } from "@/lib/date-utils";
 import {
   checkLocationPermission,
@@ -25,7 +28,10 @@ import {
   Download,
   ExternalLink,
   FileJson,
+  HardDriveDownload,
   KeyRound,
+  Laptop,
+  RefreshCw,
   Loader2,
   LocateFixed,
   MapPin,
@@ -41,6 +47,23 @@ const PERMISSION_TEXT: Record<PermissionState, string> = {
   prompt: "Разрешение ещё не запрошено",
   unknown: "Состояние неизвестно",
 };
+
+function downloadText(text: string, filename: string, type: string) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
 
 function GeolocationSection({ onOpenGeoScreen }: { onOpenGeoScreen?: () => void }) {
   const [state, setState] = useState<PermissionState>("unknown");
@@ -158,16 +181,20 @@ export function SettingsView({
   const [clients, setClients] = useClients();
   const [expenses, setExpenses] = useExpenses();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const syncInputRef = useRef<HTMLInputElement>(null);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [pendingBackup, setPendingBackup] = useState<BackupData | null>(null);
+  const [pendingSync, setPendingSync] = useState<SyncPackage | null>(null);
+  const latestAutoBackup = useLatestAutomaticBackup();
   useDialog(true, () => {
     if (pendingBackup) setPendingBackup(null);
+    else if (pendingSync) setPendingSync(null);
     else onClose();
   });
 
   async function exportBackup() {
-    const backup = createBackup({
+    const backup = await createCompleteBackup({
       orders,
       clients,
       expenses,
@@ -229,9 +256,85 @@ export function SettingsView({
     setRates(pendingBackup.rates);
     setShiftRates(pendingBackup.shiftRates);
     setSettings(pendingBackup.settings);
+    void replaceAttachments(pendingBackup.attachments ?? []);
     setPendingBackup(null);
     setBackupError(null);
     setBackupMessage("Резервная копия восстановлена.");
+  }
+
+  async function exportSync() {
+    const sync = await createSyncPackage({
+      orders,
+      clients,
+      expenses,
+      rates,
+      shiftRates,
+      settings,
+    });
+    const filename = `smena-sync-${toISODate(new Date())}.json`;
+    const json = JSON.stringify(sync, null, 2);
+    const file = new File([json], filename, { type: "application/json" });
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ title: "Синхронизация «Смена»", files: [file] });
+        setBackupError(null);
+        setBackupMessage("Пакет синхронизации отправлен.");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    downloadText(json, filename, "application/json");
+    setBackupError(null);
+    setBackupMessage("Пакет синхронизации скачан.");
+  }
+
+  async function importSync(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      setPendingSync(parseSyncPackage(await file.text()));
+      setBackupError(null);
+      setBackupMessage(null);
+    } catch (error) {
+      setBackupMessage(null);
+      setBackupError(error instanceof Error ? error.message : "Не удалось прочитать пакет.");
+    }
+  }
+
+  function applySync() {
+    if (!pendingSync) return;
+    const merged = mergeSyncData(
+      { orders, clients, expenses, rates, shiftRates, settings },
+      pendingSync,
+    );
+    setOrders(merged.orders);
+    setClients(merged.clients);
+    setExpenses(merged.expenses);
+    setRates(merged.rates);
+    setShiftRates(merged.shiftRates);
+    setSettings(merged.settings);
+    void mergeAttachmentExports(pendingSync.attachments ?? []);
+    setPendingSync(null);
+    setBackupError(null);
+    setBackupMessage("Данные объединены. Более новые записи сохранены.");
+  }
+
+  async function restoreAutomatic() {
+    try {
+      const backup = await restoreLatestAutomaticBackup();
+      if (!backup) {
+        setBackupError("Автоматических копий пока нет.");
+        return;
+      }
+      setPendingBackup(backup);
+      setBackupError(null);
+      setBackupMessage(null);
+    } catch {
+      setBackupError("Не удалось открыть автоматическую копию.");
+    }
   }
 
   function setRate(setter: typeof setRates, work: string, value: string) {
@@ -409,7 +512,8 @@ export function SettingsView({
                 Резервная копия
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Сохраняет заказы, клиентов, расходы, ставки и настройки в файл на телефоне.
+                Сохраняет заказы, клиентов, расходы, ставки, настройки и вложенные фото/голосовые
+                заметки в файл.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -444,6 +548,77 @@ export function SettingsView({
             {backupError && <p className="text-sm text-destructive">{backupError}</p>}
           </section>
 
+          <section className="space-y-3 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-start gap-3">
+              <HardDriveDownload className="size-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                  Автоматические копии
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  После изменений приложение сохраняет до пяти последних копий на устройстве,
+                  включая фото и голосовые заметки.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm">
+              {latestAutoBackup
+                ? `Последняя копия: ${new Date(latestAutoBackup.createdAt).toLocaleString("ru-RU")} · ${formatBytes(latestAutoBackup.size)}`
+                : "Копия будет создана автоматически после первого изменения данных."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void restoreAutomatic()}
+              disabled={!latestAutoBackup}
+              className="w-full min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <HardDriveDownload className="size-4" /> Восстановить последнюю копию
+            </button>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-start gap-3">
+              <RefreshCw className="size-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                  Синхронизация телефона и компьютера
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Создайте пакет на одном устройстве и передайте его через Telegram, почту или
+                  кабель. На втором устройстве выберите «Объединить» — существующие данные не
+                  удаляются, более новые записи заменяют старые.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void exportSync()}
+                className="min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+              >
+                <Laptop className="size-4" /> Выгрузить пакет
+              </button>
+              <button
+                type="button"
+                onClick={() => syncInputRef.current?.click()}
+                className="min-h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+              >
+                <Upload className="size-4" /> Объединить пакет
+              </button>
+            </div>
+            <input
+              ref={syncInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={importSync}
+              className="sr-only"
+              aria-label="Выбрать пакет синхронизации"
+            />
+            <p className="text-xs text-muted-foreground">
+              Для двусторонней синхронизации выгрузите пакет обратно после объединения.
+            </p>
+          </section>
+
           <GeolocationSection onOpenGeoScreen={onOpenGeoScreen} />
         </div>
 
@@ -464,6 +639,15 @@ export function SettingsView({
           confirmLabel="Заменить данные"
           onCancel={() => setPendingBackup(null)}
           onConfirm={applyBackup}
+        />
+      )}
+      {pendingSync && (
+        <ConfirmDialog
+          title="Объединить данные?"
+          description={`В пакете: ${pendingSync.orders.length} заказов, ${pendingSync.clients.length} клиентов и ${pendingSync.expenses.length} расходов. Новые записи добавятся, конфликты будут разрешены по времени изменения.`}
+          confirmLabel="Объединить"
+          onCancel={() => setPendingSync(null)}
+          onConfirm={applySync}
         />
       )}
     </div>

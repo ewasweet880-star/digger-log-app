@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "build:capacitor": "vite build --config vite.capacitor.config.ts",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -13,8 +14,8 @@
     "format": "prettier --write .",
     "android:fix": "node scripts/android-permissions.mjs",
     "android:verify": "node scripts/android-permissions.mjs --check",
-    "android:add": "npx cap add android && npm run android:fix && npm run android:verify",
-    "android:sync": "npx cap sync android && npm run android:fix && npm run android:verify",
+    "android:add": "npm run build:capacitor && npx cap add android && npm run android:fix && npm run android:verify",
+    "android:sync": "npm run build:capacitor && npx cap sync android && npm run android:fix && npm run android:verify",
     "capacitor:sync:after": "node scripts/android-permissions.mjs"
   },
   "dependencies": {

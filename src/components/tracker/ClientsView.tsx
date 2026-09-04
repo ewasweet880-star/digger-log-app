@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Phone, Search, Trash2, UserPlus, X, Pencil } from "lucide-react";
+import { ContactRound, Phone, Search, Trash2, UserPlus, X, Pencil } from "lucide-react";
 import {
   useClients,
   useOrders,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/tracker-storage";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useDialog } from "@/hooks/use-dialog";
+import { createVCard, downloadFile } from "@/lib/integrations";
 
 export function ClientsView() {
   const [clients, setClients] = useClients();
@@ -71,6 +72,14 @@ export function ClientsView() {
 
   function requestRemove(client: Client) {
     setPendingDelete(client);
+  }
+
+  function exportContact(client: Client) {
+    downloadFile(
+      createVCard(client),
+      `${client.name.replace(/[^a-zа-яё0-9]+/gi, "-") || "client"}.vcf`,
+      "text/vcard;charset=utf-8",
+    );
   }
 
   function confirmRemove() {
@@ -157,6 +166,15 @@ export function ClientsView() {
                     >
                       <Pencil className="size-3" /> изменить
                     </button>
+                    {client.phone && (
+                      <button
+                        type="button"
+                        onClick={() => exportContact(client)}
+                        className="min-h-9 text-xs text-primary inline-flex items-center gap-1"
+                      >
+                        <ContactRound className="size-3" /> в контакты
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => requestRemove(client)}
@@ -228,6 +246,7 @@ function ClientForm({
       phone: phone.trim() || undefined,
       note: note.trim() || undefined,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 

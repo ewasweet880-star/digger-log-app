@@ -5,9 +5,20 @@ import {
   formatMoney,
   orderTotal,
   parseISODate,
+  expenseLabel,
 } from "@/lib/tracker-storage";
 import { calculateEarnings } from "@/lib/tracker-calculations";
-import { TrendingUp, Wallet, Clock, CheckCircle2, Fuel, Wrench } from "lucide-react";
+import {
+  CheckCircle2,
+  FileSpreadsheet,
+  Fuel,
+  Printer,
+  TrendingUp,
+  Wallet,
+  Wrench,
+  Clock,
+} from "lucide-react";
+import { downloadFile } from "@/lib/integrations";
 
 export function EarningsView() {
   const [orders] = useOrders();
@@ -34,8 +45,62 @@ export function EarningsView() {
 
   const max = Math.max(1, ...byMonth.map(([, value]) => value.amount));
 
+  function exportExcel() {
+    const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+    const orderRows = orders
+      .filter((order) => order.status !== "cancelled" && order.date.startsWith(monthKey))
+      .map((order) => [
+        order.date,
+        order.clientName,
+        order.workType,
+        order.status,
+        order.hours ?? "",
+        order.actualHours ?? "",
+        order.price,
+        order.delivery ?? 0,
+        orderTotal(order),
+        order.paid ? "Да" : "Нет",
+        order.completedAt ?? "",
+        order.paidAt ?? "",
+      ]);
+    const expenseRows = expenses
+      .filter((expense) => expense.date.startsWith(monthKey))
+      .map((expense) => [
+        expense.date,
+        expenseLabel(expense.category),
+        expense.note ?? "",
+        expense.amount,
+      ]);
+    const rows = [
+      [
+        "Дата",
+        "Клиент",
+        "Работа",
+        "Статус",
+        "План, ч",
+        "Факт, ч",
+        "Работа, ₽",
+        "Доставка, ₽",
+        "Итого, ₽",
+        "Оплачено",
+        "Завершён",
+        "Оплачен",
+      ],
+      ...orderRows,
+      [],
+      ["РАСХОДЫ ЗА МЕСЯЦ"],
+      ["Дата", "Категория", "Комментарий", "Сумма, ₽"],
+      ...expenseRows,
+    ];
+    downloadFile(
+      `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`,
+      `smena-report-${monthKey}.csv`,
+      "text/csv;charset=utf-8",
+    );
+  }
+
   return (
-    <div className="p-4 pb-28 space-y-4">
+    <div className="p-4 pb-28 space-y-4 print-report">
       <div className="bg-primary text-primary-foreground rounded-3xl p-6 relative overflow-hidden">
         <div className="absolute inset-x-0 bottom-0 h-3 stripe-tape opacity-90" />
         <div className="text-xs font-bold uppercase tracking-widest opacity-80">
@@ -55,6 +120,23 @@ export function EarningsView() {
             <div className="font-bold text-lg">{stats.hoursMonth} ч</div>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 print-actions">
+        <button
+          type="button"
+          onClick={exportExcel}
+          className="min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+        >
+          <FileSpreadsheet className="size-4" /> Excel / CSV
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="min-h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+        >
+          <Printer className="size-4" /> Печать / PDF
+        </button>
       </div>
 
       <div className="bg-card border border-border rounded-3xl p-5">
@@ -158,6 +240,10 @@ export function EarningsView() {
       </div>
     </div>
   );
+}
+
+function csvCell(value: string | number) {
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 function formatHours(value: number) {

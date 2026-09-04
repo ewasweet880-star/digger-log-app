@@ -99,3 +99,25 @@
     oklch(0.16 0.012 60) 14px 28px
   );
 }
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-report,
+  .print-report * {
+    visibility: visible !important;
+  }
+  .print-report {
+    position: absolute;
+    inset: 0;
+    max-width: none !important;
+    padding: 1rem !important;
+    color: #111 !important;
+    background: #fff !important;
+  }
+  .print-report .print-actions,
+  .print-report button {
+    display: none !important;
+  }
+}

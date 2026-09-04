@@ -4,8 +4,8 @@
  * В нативном приложении (APK) сначала пробуем плагин Capacitor Geolocation —
  * только он умеет запросить системное разрешение Android (после этого пункт
  * «Геоданные» появляется в настройках приложения). Если моста Capacitor нет
- * (страница открыта по server.url и bridge не поднялся) — работаем через
- * обычный navigator.geolocation WebView.
+ * (например, если bridge временно недоступен) — работаем через обычный
+ * navigator.geolocation WebView.
  */
 
 export interface GeoPoint {

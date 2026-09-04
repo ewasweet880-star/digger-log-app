@@ -16,6 +16,7 @@ import { DatePicker } from "./DatePicker";
 import { YandexMap } from "./YandexMap";
 import { ChevronDown, Map as MapIcon, X } from "lucide-react";
 import { useDialog } from "@/hooks/use-dialog";
+import { AttachmentEditor } from "./OrderAttachments";
 
 interface Props {
   onClose: () => void;
@@ -29,6 +30,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
   const [rates] = useRates();
   const [shiftRates] = useShiftRates();
   const [settings] = useSettings();
+  const [orderId] = useState(editing?.id ?? uid());
+  const [photoIds, setPhotoIds] = useState<string[]>(editing?.photoIds ?? []);
+  const [voiceNoteIds, setVoiceNoteIds] = useState<string[]>(editing?.voiceNoteIds ?? []);
 
   const [clientName, setClientName] = useState(editing?.clientName ?? "");
   const [clientPhone, setClientPhone] = useState(editing?.clientPhone ?? "");
@@ -82,6 +86,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
     e.preventDefault();
     if (!clientName.trim()) return;
 
+    const now = new Date().toISOString();
+
     // upsert client
     let clientId = editing?.clientId;
     const cleanClientName = clientName.trim();
@@ -97,7 +103,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       if (clientPhone && existing.phone !== clientPhone) {
         setClients((prev) =>
           prev.map((client) =>
-            client.id === existing.id ? { ...client, phone: clientPhone.trim() } : client,
+            client.id === existing.id
+              ? { ...client, phone: clientPhone.trim(), updatedAt: now }
+              : client,
           ),
         );
       }
@@ -112,6 +120,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
                 ...client,
                 name: cleanClientName,
                 phone: clientPhone.trim() || client.phone,
+                updatedAt: now,
               }
             : client,
         ),
@@ -124,16 +133,16 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
           id: clientId!,
           name: cleanClientName,
           phone: clientPhone.trim() || undefined,
-          createdAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
         },
       ]);
     }
 
-    const now = new Date().toISOString();
     const startedAt = getStartedAt(editing, status, now);
     const completedAt = getCompletedAt(editing, status, now);
     const order: Order = {
-      id: editing?.id ?? uid(),
+      id: orderId,
       clientId,
       clientName: clientName.trim(),
       clientPhone: clientPhone || undefined,
@@ -147,6 +156,8 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       delivery: delivery ? Number(delivery) : undefined,
       paid,
       actualHours: getActualHours(editing, status, startedAt, completedAt),
+      photoIds: photoIds.length > 0 ? photoIds : undefined,
+      voiceNoteIds: voiceNoteIds.length > 0 ? voiceNoteIds : undefined,
       startedAt,
       completedAt,
       paidAt: paid ? (editing?.paidAt ?? (!editing?.paid ? now : undefined)) : undefined,
@@ -154,6 +165,7 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       status,
       notes: notes || undefined,
       createdAt: editing?.createdAt ?? now,
+      updatedAt: now,
     };
 
     setOrders((prev) =>
@@ -415,6 +427,16 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
                   placeholder="Дополнительно..."
                 />
               </Field>
+
+              <AttachmentEditor
+                orderId={orderId}
+                photoIds={photoIds}
+                voiceNoteIds={voiceNoteIds}
+                onChange={(nextPhotos, nextVoiceNotes) => {
+                  setPhotoIds(nextPhotos);
+                  setVoiceNoteIds(nextVoiceNotes);
+                }}
+              />
             </>
           )}
         </div>

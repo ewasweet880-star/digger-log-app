@@ -210,6 +210,7 @@ function ExpenseForm({
       date,
       note: note.trim() || undefined,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 

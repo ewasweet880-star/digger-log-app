@@ -1,4 +1,5 @@
 import type { Client, Expense, Order, Rates, Settings } from "./tracker-storage";
+import { attachmentIds, exportAttachments, type AttachmentExport } from "./attachments";
 import { parseISODate } from "./date-utils";
 
 export const BACKUP_KIND = "digger-log-backup";
@@ -14,6 +15,8 @@ export interface BackupData {
   rates: Rates;
   shiftRates: Rates;
   settings: Settings;
+  /** Медиа вкладываются в полный экспорт, старые backup-файлы остаются совместимыми. */
+  attachments?: AttachmentExport[];
 }
 
 export interface BackupSource {
@@ -41,6 +44,13 @@ export function createBackup(source: BackupSource): BackupData {
   };
 }
 
+export async function createCompleteBackup(source: BackupSource): Promise<BackupData> {
+  const backup = createBackup(source);
+  const ids = source.orders.flatMap((order) => attachmentIds(order.photoIds, order.voiceNoteIds));
+  backup.attachments = await exportAttachments(ids);
+  return backup;
+}
+
 export function parseBackup(text: string): BackupData {
   let value: unknown;
   try {
@@ -66,6 +76,7 @@ export function parseBackup(text: string): BackupData {
     rates: readRates(value.rates, "ставки за час"),
     shiftRates: readRates(value.shiftRates, "ставки за смену"),
     settings: readSettings(value.settings),
+    attachments: readArray(value.attachments ?? [], isAttachmentExport, "медиафайлы"),
   };
 }
 
@@ -128,13 +139,32 @@ function isOrder(value: unknown): value is Order {
     isOptionalString(value.clientPhone) &&
     isOptionalNumber(value.hours) &&
     isOptionalNumber(value.actualHours) &&
+    isOptionalStringArray(value.photoIds) &&
+    isOptionalStringArray(value.voiceNoteIds) &&
     isOptionalNumber(value.delivery) &&
     isOptionalString(value.startedAt) &&
     isOptionalString(value.completedAt) &&
     isOptionalString(value.paidAt) &&
     isOptionalString(value.notes) &&
     isOptionalFiniteNumber(value.lat) &&
-    isOptionalFiniteNumber(value.lng)
+    isOptionalFiniteNumber(value.lng) &&
+    isOptionalString(value.updatedAt)
+  );
+}
+
+function isAttachmentExport(value: unknown): value is AttachmentExport {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.kind === "photo" || value.kind === "voice") &&
+    typeof value.orderId === "string" &&
+    typeof value.name === "string" &&
+    typeof value.mimeType === "string" &&
+    isNonNegativeNumber(value.size) &&
+    typeof value.createdAt === "string" &&
+    isOptionalNumber(value.duration) &&
+    typeof value.dataUrl === "string" &&
+    value.dataUrl.startsWith("data:")
   );
 }
 
@@ -145,7 +175,8 @@ function isClient(value: unknown): value is Client {
     typeof value.name === "string" &&
     typeof value.createdAt === "string" &&
     isOptionalString(value.phone) &&
-    isOptionalString(value.note)
+    isOptionalString(value.note) &&
+    isOptionalString(value.updatedAt)
   );
 }
 
@@ -160,7 +191,8 @@ function isExpense(value: unknown): value is Expense {
     typeof value.createdAt === "string" &&
     isOptionalNumber(value.liters) &&
     isOptionalString(value.note) &&
-    isOptionalString(value.orderId)
+    isOptionalString(value.orderId) &&
+    isOptionalString(value.updatedAt)
   );
 }
 
@@ -182,6 +214,12 @@ function isOptionalFiniteNumber(value: unknown): value is number | undefined {
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
+}
+
+function isOptionalStringArray(value: unknown): value is string[] | undefined {
+  return (
+    value === undefined || (Array.isArray(value) && value.every((item) => typeof item === "string"))
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

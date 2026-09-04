@@ -1,0 +1,17 @@
+{
+  "name": "Смена — учёт заказов",
+  "short_name": "Смена",
+  "description": "Офлайн-учёт заказов, клиентов, расходов и заработка для оператора техники.",
+  "lang": "ru",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0f11",
+  "theme_color": "#f5a524",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

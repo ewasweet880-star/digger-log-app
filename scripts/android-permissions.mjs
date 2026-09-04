@@ -1,9 +1,9 @@
 /**
- * Добавляет разрешения геолокации в android/app/src/main/AndroidManifest.xml.
+ * Добавляет разрешения геолокации и медиа в android/app/src/main/AndroidManifest.xml.
  *
  * Запуск: node scripts/android-permissions.mjs  (или npm run android:fix)
- * Нужен, если в настройках телефона у приложения написано
- * «Разрешений не требуется» — значит манифест собрался без строк доступа к GPS.
+ * Нужен, если в настройках телефона у приложения отсутствует доступ к GPS,
+ * камере или микрофону.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
@@ -14,6 +14,8 @@ const LINES = [
   '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
   '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
   '<uses-feature android:name="android.hardware.location.gps" android:required="false" />',
+  '<uses-permission android:name="android.permission.CAMERA" />',
+  '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
 ];
 
 if (!existsSync(FILE)) {
@@ -25,7 +27,7 @@ let xml = readFileSync(FILE, "utf8");
 const missing = LINES.filter((l) => !xml.includes(l.split('name="')[1].split('"')[0]));
 
 if (missing.length === 0) {
-  console.log("✓ Разрешения геолокации есть в AndroidManifest.xml.");
+  console.log("✓ Разрешения геолокации, камеры и микрофона есть в AndroidManifest.xml.");
   process.exit(0);
 }
 
@@ -53,4 +55,4 @@ if (stillMissing.length > 0) {
   process.exit(1);
 }
 
-console.log("✓ Манифест готов. Теперь можно собирать APK.");
+console.log("✓ Манифест готов. Теперь можно собирать APK с доступом к геолокации и медиа.");
