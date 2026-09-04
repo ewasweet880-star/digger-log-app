@@ -129,6 +129,9 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       ]);
     }
 
+    const now = new Date().toISOString();
+    const startedAt = getStartedAt(editing, status, now);
+    const completedAt = getCompletedAt(editing, status, now);
     const order: Order = {
       id: editing?.id ?? uid(),
       clientId,
@@ -143,10 +146,14 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       price: price ? Number(price) : 0,
       delivery: delivery ? Number(delivery) : undefined,
       paid,
+      actualHours: getActualHours(editing, status, startedAt, completedAt),
+      startedAt,
+      completedAt,
+      paidAt: paid ? (editing?.paidAt ?? (!editing?.paid ? now : undefined)) : undefined,
 
       status,
       notes: notes || undefined,
-      createdAt: editing?.createdAt ?? new Date().toISOString(),
+      createdAt: editing?.createdAt ?? now,
     };
 
     setOrders((prev) =>
@@ -430,6 +437,29 @@ export function OrderForm({ onClose, editing, defaultDate }: Props) {
       </form>
     </div>
   );
+}
+
+function getStartedAt(editing: Order | undefined, status: OrderStatus, now: string) {
+  if (editing?.startedAt) return editing.startedAt;
+  return status === "in_progress" ? now : undefined;
+}
+
+function getCompletedAt(editing: Order | undefined, status: OrderStatus, now: string) {
+  if (editing?.completedAt) return editing.completedAt;
+  return status === "done" ? now : undefined;
+}
+
+function getActualHours(
+  editing: Order | undefined,
+  status: OrderStatus,
+  startedAt: string | undefined,
+  completedAt: string | undefined,
+) {
+  if (status !== "done") return editing?.actualHours;
+  if (editing?.status === "done" && editing.actualHours != null) return editing.actualHours;
+  if (!startedAt || !completedAt) return editing?.actualHours;
+  const duration = (Date.parse(completedAt) - Date.parse(startedAt)) / 3_600_000;
+  return Number.isFinite(duration) ? Math.max(0, Math.round(duration * 10) / 10) : undefined;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

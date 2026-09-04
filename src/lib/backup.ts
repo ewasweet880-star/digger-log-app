@@ -127,7 +127,11 @@ function isOrder(value: unknown): value is Order {
     isOptionalString(value.clientId) &&
     isOptionalString(value.clientPhone) &&
     isOptionalNumber(value.hours) &&
+    isOptionalNumber(value.actualHours) &&
     isOptionalNumber(value.delivery) &&
+    isOptionalString(value.startedAt) &&
+    isOptionalString(value.completedAt) &&
+    isOptionalString(value.paidAt) &&
     isOptionalString(value.notes) &&
     isOptionalFiniteNumber(value.lat) &&
     isOptionalFiniteNumber(value.lng)

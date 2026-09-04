@@ -15,20 +15,24 @@ export function EarningsView() {
   const stats = useMemo(() => calculateEarnings(orders, expenses), [orders, expenses]);
 
   const byMonth = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const o of orders) {
-      if (o.status !== "done") continue;
-      const d = parseISODate(o.date);
-      if (Number.isNaN(d.getTime())) continue;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      map.set(key, (map.get(key) ?? 0) + orderTotal(o));
+    const map = new Map<string, { amount: number; hours: number }>();
+    for (const order of orders) {
+      if (order.status !== "done") continue;
+      const date = parseISODate(order.date);
+      if (Number.isNaN(date.getTime())) continue;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const previous = map.get(key) ?? { amount: 0, hours: 0 };
+      map.set(key, {
+        amount: previous.amount + orderTotal(order),
+        hours: previous.hours + (order.actualHours ?? order.hours ?? 0),
+      });
     }
     return Array.from(map.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
       .slice(0, 6);
   }, [orders]);
 
-  const max = Math.max(1, ...byMonth.map(([, v]) => v));
+  const max = Math.max(1, ...byMonth.map(([, value]) => value.amount));
 
   return (
     <div className="p-4 pb-28 space-y-4">
@@ -122,23 +126,29 @@ export function EarningsView() {
           <p className="text-sm text-muted-foreground">Нет данных.</p>
         ) : (
           <div className="space-y-3">
-            {byMonth.map(([k, v]) => {
-              const [y, m] = k.split("-");
-              const name = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("ru-RU", {
-                month: "long",
-                year: "2-digit",
-              });
+            {byMonth.map(([key, value]) => {
+              const [year, month] = key.split("-");
+              const name = new Date(Number(year), Number(month) - 1, 1).toLocaleDateString(
+                "ru-RU",
+                {
+                  month: "long",
+                  year: "2-digit",
+                },
+              );
               return (
-                <div key={k}>
+                <div key={key}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="capitalize text-muted-foreground">{name}</span>
-                    <span className="font-bold">{formatMoney(v)}</span>
+                    <span className="font-bold">{formatMoney(value.amount)}</span>
                   </div>
                   <div className="h-2 rounded-full bg-secondary overflow-hidden">
                     <div
                       className="h-full bg-primary rounded-full"
-                      style={{ width: `${(v / max) * 100}%` }}
+                      style={{ width: `${(value.amount / max) * 100}%` }}
                     />
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Фактически отработано: {formatHours(value.hours)} ч
                   </div>
                 </div>
               );
@@ -148,6 +158,10 @@ export function EarningsView() {
       </div>
     </div>
   );
+}
+
+function formatHours(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function StatCard({

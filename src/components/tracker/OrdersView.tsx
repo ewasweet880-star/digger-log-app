@@ -1,6 +1,23 @@
 import { useMemo, useState } from "react";
 import {
+  BadgeCheck,
+  CheckCircle2,
+  CircleDashed,
+  Clock,
+  Loader2,
+  MapPin,
+  Navigation,
+  Pencil,
+  Phone,
+  Play,
+  Plus,
+  Square,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+import {
   useOrders,
+  useExpenses,
   formatMoney,
   orderTotal,
   formatDate,
@@ -9,20 +26,8 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/tracker-storage";
+import { calculateDailyReport, type DailyReport } from "@/lib/tracker-calculations";
 import { OrderForm } from "./OrderForm";
-import {
-  Plus,
-  MapPin,
-  Phone,
-  Clock,
-  CheckCircle2,
-  CircleDashed,
-  Loader2,
-  XCircle,
-  Trash2,
-  Pencil,
-  Navigation,
-} from "lucide-react";
 import {
   canNavigate,
   openNavigator,
@@ -48,49 +53,79 @@ type Filter = "today" | "upcoming" | "done" | "all";
 
 export function OrdersView() {
   const [orders, setOrders] = useOrders();
+  const [expenses] = useExpenses();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Order | undefined>();
   const [filter, setFilter] = useState<Filter>("today");
   const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const dailyReport = useMemo(() => calculateDailyReport(orders, expenses), [orders, expenses]);
+  const currentOrderCount =
+    dailyReport.scheduledCount +
+    orders.filter((order) => order.status === "in_progress" && order.date !== dailyReport.date)
+      .length;
 
   const grouped = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const filtered = orders
-      .filter((o) => {
-        const d = parseISODate(o.date);
-        if (Number.isNaN(d.getTime())) return false;
-        if (filter === "today") return isSameDay(d, now);
-        if (filter === "upcoming") return d.getTime() > now.getTime() && o.status !== "cancelled";
-        if (filter === "done") return o.status === "done";
+      .filter((order) => {
+        const date = parseISODate(order.date);
+        if (Number.isNaN(date.getTime())) return false;
+        if (filter === "today") {
+          return isSameDay(date, now) || order.status === "in_progress";
+        }
+        if (filter === "upcoming") {
+          return date.getTime() > now.getTime() && order.status !== "cancelled";
+        }
+        if (filter === "done") return order.status === "done";
         return true;
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const map = new Map<string, Order[]>();
-    for (const o of filtered) {
-      const key = o.date;
-      map.set(key, [...(map.get(key) ?? []), o]);
+    for (const order of filtered) {
+      map.set(order.date, [...(map.get(order.date) ?? []), order]);
     }
     return Array.from(map.entries());
   }, [orders, filter]);
 
-  const todayCount = orders.filter((o) => {
-    const d = parseISODate(o.date);
-    return !Number.isNaN(d.getTime()) && isSameDay(d, today);
-  }).length;
+  function updateOrder(id: string, patch: Partial<Order>) {
+    setOrders((previous) =>
+      previous.map((order) => (order.id === id ? { ...order, ...patch } : order)),
+    );
+  }
 
-  function removeOrder(id: string) {
+  function startOrder(id: string) {
+    updateOrder(id, { status: "in_progress", startedAt: new Date().toISOString() });
+  }
+
+  function finishOrder(id: string) {
+    const order = orders.find((item) => item.id === id);
+    const completedAt = new Date().toISOString();
+    const elapsedHours = order?.startedAt
+      ? (Date.parse(completedAt) - Date.parse(order.startedAt)) / 3_600_000
+      : Number.NaN;
+    const actualHours = Number.isFinite(elapsedHours) ? roundHours(elapsedHours) : undefined;
+    updateOrder(id, {
+      status: "done",
+      completedAt,
+      ...(actualHours !== undefined ? { actualHours } : {}),
+    });
+  }
+
+  function markPaid(id: string) {
+    updateOrder(id, { paid: true, paidAt: new Date().toISOString() });
+  }
+
+  function requestRemoveOrder(id: string) {
     const order = orders.find((item) => item.id === id);
     if (order) setPendingDelete(order);
   }
 
   function confirmRemoveOrder() {
     if (!pendingDelete) return;
-    setOrders((prev) => prev.filter((o) => o.id !== pendingDelete.id));
+    setOrders((previous) => previous.filter((order) => order.id !== pendingDelete.id));
     setPendingDelete(null);
   }
 
@@ -100,26 +135,29 @@ export function OrdersView() {
         <div className="flex gap-1 overflow-x-auto px-3 py-2">
           {(
             [
-              ["today", `Сегодня${todayCount ? ` · ${todayCount}` : ""}`],
+              ["today", `Сегодня${currentOrderCount ? ` · ${currentOrderCount}` : ""}`],
               ["upcoming", "Ближайшие"],
               ["done", "Выполнено"],
               ["all", "Все"],
             ] as [Filter, string][]
-          ).map(([v, l]) => (
+          ).map(([value, label]) => (
             <button
-              key={v}
-              onClick={() => setFilter(v)}
-              className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition ${
-                filter === v
+              key={value}
+              type="button"
+              onClick={() => setFilter(value)}
+              className={`shrink-0 min-h-11 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition ${
+                filter === value
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              {l}
+              {label}
             </button>
           ))}
         </div>
       </div>
+
+      {filter === "today" && <DailyReportCard report={dailyReport} />}
 
       {grouped.length === 0 ? (
         <EmptyState onAdd={() => setFormOpen(true)} />
@@ -131,15 +169,18 @@ export function OrdersView() {
                 {formatDate(date)}
               </h3>
               <div className="space-y-2">
-                {items.map((o) => (
+                {items.map((order) => (
                   <OrderCard
-                    key={o.id}
-                    order={o}
+                    key={order.id}
+                    order={order}
+                    onStart={() => startOrder(order.id)}
+                    onFinish={() => finishOrder(order.id)}
+                    onPaid={() => markPaid(order.id)}
                     onEdit={() => {
-                      setEditing(o);
+                      setEditing(order);
                       setFormOpen(true);
                     }}
-                    onDelete={() => removeOrder(o.id)}
+                    onDelete={() => requestRemoveOrder(order.id)}
                   />
                 ))}
               </div>
@@ -149,6 +190,7 @@ export function OrdersView() {
       )}
 
       <button
+        type="button"
         onClick={() => {
           setEditing(undefined);
           setFormOpen(true);
@@ -181,18 +223,139 @@ export function OrdersView() {
   );
 }
 
+function DailyReportCard({ report }: { report: DailyReport }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const reportDate = parseISODate(report.date);
+
+  async function share() {
+    const text = dailyReportText(report);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Отчёт за ${report.date}`, text });
+        setMessage("Отчёт отправлен.");
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setMessage("Отчёт скопирован.");
+        return;
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    link.download = `smena-report-${report.date}.txt`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    setMessage("Отчёт скачан.");
+  }
+
+  return (
+    <section className="p-3 pb-0" aria-labelledby="daily-report-title">
+      <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="size-10 rounded-xl bg-primary/15 text-primary grid place-items-center shrink-0">
+            <BadgeCheck className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="daily-report-title" className="font-display text-lg uppercase leading-tight">
+              Отчёт за сегодня
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {Number.isNaN(reportDate.getTime())
+                ? report.date
+                : reportDate.toLocaleDateString("ru-RU", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">обновляется сам</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <ReportMetric label="Запланировано" value={String(report.plannedCount)} />
+          <ReportMetric label="Выполняется" value={String(report.inProgressCount)} />
+          <ReportMetric label="Завершено" value={String(report.completedCount)} positive />
+          <ReportMetric label="Заработано" value={formatMoney(report.earned)} />
+          <ReportMetric label="Получено" value={formatMoney(report.received)} positive />
+          <ReportMetric label="К получению" value={formatMoney(report.toReceive)} />
+          <ReportMetric label="Часы работы" value={`${formatHours(report.hours)} ч`} />
+          <ReportMetric label="Расходы" value={formatMoney(report.expenses)} negative />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border pt-3">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Итого за день
+            </div>
+            <div
+              className={`font-display text-2xl ${report.net >= 0 ? "text-[color:var(--success)]" : "text-destructive"}`}
+            >
+              {formatMoney(report.net)}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={share}
+            className="min-h-11 px-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold"
+          >
+            Поделиться отчётом
+          </button>
+        </div>
+        {message && <p className="text-xs text-[color:var(--success)]">{message}</p>}
+      </div>
+    </section>
+  );
+}
+
+function ReportMetric({
+  label,
+  value,
+  positive = false,
+  negative = false,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <div className="rounded-xl bg-secondary/60 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div
+        className={`font-semibold mt-0.5 ${
+          positive ? "text-[color:var(--success)]" : negative ? "text-destructive" : ""
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function OrderCard({
   order,
+  onStart,
+  onFinish,
+  onPaid,
   onEdit,
   onDelete,
 }: {
   order: Order;
+  onStart: () => void;
+  onFinish: () => void;
+  onPaid: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const meta = STATUS_META[order.status];
   const Icon = meta.icon;
   const [askGeo, setAskGeo] = useState(false);
+  const shownHours = order.actualHours ?? order.hours;
 
   async function route() {
     const remembered =
@@ -240,7 +403,7 @@ function OrderCard({
         </div>
       </div>
 
-      {(order.location || order.clientPhone || order.hours) && (
+      {(order.location || order.clientPhone || shownHours != null || order.startedAt) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           {order.location && (
             <span className="inline-flex items-center gap-1 min-w-0">
@@ -248,12 +411,19 @@ function OrderCard({
               <span className="truncate">{order.location}</span>
             </span>
           )}
-          {order.hours ? (
+          {shownHours != null ? (
             <span className="inline-flex items-center gap-1">
               <Clock className="size-3.5" />
-              {order.hours} ч
+              {order.actualHours != null ? "Факт " : "План "}
+              {formatHours(shownHours)} ч
             </span>
           ) : null}
+          {order.startedAt && order.status === "in_progress" && (
+            <span>Начато в {formatTime(order.startedAt)}</span>
+          )}
+          {order.completedAt && order.status === "done" && (
+            <span>Завершено в {formatTime(order.completedAt)}</span>
+          )}
           {order.clientPhone && (
             <a
               href={`tel:${order.clientPhone}`}
@@ -270,27 +440,58 @@ function OrderCard({
         <p className="text-sm text-muted-foreground border-l-2 border-border pl-2">{order.notes}</p>
       )}
 
+      {order.status === "planned" && (
+        <button
+          type="button"
+          onClick={onStart}
+          className="w-full min-h-12 rounded-xl bg-primary text-primary-foreground font-bold inline-flex items-center justify-center gap-2"
+        >
+          <Play className="size-4" fill="currentColor" /> Начать работу
+        </button>
+      )}
+      {order.status === "in_progress" && (
+        <button
+          type="button"
+          onClick={onFinish}
+          className="w-full min-h-12 rounded-xl bg-primary text-primary-foreground font-bold inline-flex items-center justify-center gap-2"
+        >
+          <Square className="size-4" fill="currentColor" /> Завершить
+        </button>
+      )}
+      {order.status === "done" && !order.paid && (
+        <button
+          type="button"
+          onClick={onPaid}
+          className="w-full min-h-12 rounded-xl bg-[color:var(--success)] text-primary-foreground font-bold inline-flex items-center justify-center gap-2"
+        >
+          <BadgeCheck className="size-4" /> Оплачено
+        </button>
+      )}
+
       <div className="flex gap-2 pt-1">
         {canNavigate(order) && (
           <button
+            type="button"
             onClick={route}
-            className="flex-1 min-h-11 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
+            className="flex-1 min-h-11 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-bold inline-flex items-center justify-center gap-1"
           >
             <Navigation className="size-4" /> Маршрут
           </button>
         )}
         <button
+          type="button"
           onClick={onEdit}
           className="flex-1 min-h-11 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium inline-flex items-center justify-center gap-1"
         >
           <Pencil className="size-4" /> Изменить
         </button>
         <button
+          type="button"
           onClick={onDelete}
           className="min-h-11 min-w-11 rounded-lg bg-secondary text-destructive text-sm"
           aria-label="Удалить"
         >
-          <Trash2 className="size-4" />
+          <Trash2 className="mx-auto size-4" />
         </button>
       </div>
 
@@ -306,11 +507,41 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <h3 className="font-display text-2xl uppercase mb-2">Пусто</h3>
       <p className="text-muted-foreground mb-6">Здесь появятся заказы. Добавьте первый.</p>
       <button
+        type="button"
         onClick={onAdd}
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide"
+        className="inline-flex min-h-12 items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wide"
       >
         <Plus className="size-5" /> Новый заказ
       </button>
     </div>
   );
+}
+
+function dailyReportText(report: DailyReport) {
+  return [
+    `Отчёт «Смена» за ${report.date}`,
+    `Запланировано: ${report.plannedCount}`,
+    `Выполняется: ${report.inProgressCount}`,
+    `Завершено: ${report.completedCount}`,
+    `Заработано: ${formatMoney(report.earned)}`,
+    `Получено: ${formatMoney(report.received)}`,
+    `К получению: ${formatMoney(report.toReceive)}`,
+    `Часов: ${formatHours(report.hours)}`,
+    `Расходы: ${formatMoney(report.expenses)}`,
+    `Итого за день: ${formatMoney(report.net)}`,
+  ].join("\n");
+}
+
+function formatHours(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatTime(timestamp: string) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+function roundHours(value: number) {
+  return Math.max(0, Math.round(value * 10) / 10);
 }

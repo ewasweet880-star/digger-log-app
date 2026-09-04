@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateEarnings } from "./tracker-calculations";
+import { calculateDailyReport, calculateEarnings } from "./tracker-calculations";
 import type { Expense, Order } from "./tracker-storage";
 
 const now = new Date(2026, 8, 3, 12); // Thursday, 3 September 2026
@@ -81,5 +81,61 @@ describe("calculateEarnings", () => {
 
     expect(summary.scheduledMonth).toBe(0);
     expect(summary.planned).toBe(9000);
+  });
+});
+
+describe("calculateDailyReport", () => {
+  it("uses completion and payment timestamps for the daily workflow", () => {
+    const report = calculateDailyReport(
+      [
+        order({
+          id: "finished-today",
+          date: "2026-09-03",
+          price: 2000,
+          actualHours: 3,
+          completedAt: "2026-09-03T11:00:00",
+          paid: true,
+          paidAt: "2026-09-03T12:00:00",
+        }),
+        order({
+          id: "overdue-finished-today",
+          date: "2026-09-02",
+          price: 3000,
+          actualHours: 2,
+          completedAt: "2026-09-03T17:00:00",
+        }),
+        order({
+          id: "in-progress",
+          date: "2026-09-03",
+          price: 4000,
+          status: "in_progress",
+        }),
+        order({
+          id: "planned",
+          date: "2026-09-03",
+          price: 5000,
+          status: "planned",
+        }),
+        order({
+          id: "cancelled",
+          date: "2026-09-03",
+          price: 6000,
+          status: "cancelled",
+        }),
+      ],
+      [expense({ date: "2026-09-03", amount: 500 })],
+      now,
+    );
+
+    expect(report.scheduledCount).toBe(3);
+    expect(report.plannedCount).toBe(1);
+    expect(report.inProgressCount).toBe(1);
+    expect(report.completedCount).toBe(2);
+    expect(report.earned).toBe(5000);
+    expect(report.received).toBe(2000);
+    expect(report.toReceive).toBe(3000);
+    expect(report.hours).toBe(5);
+    expect(report.expenses).toBe(500);
+    expect(report.net).toBe(4500);
   });
 });

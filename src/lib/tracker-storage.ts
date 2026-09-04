@@ -22,12 +22,18 @@ export interface Order {
   location: string;
   date: string; // ISO date
   hours?: number;
+  /** Фактическая длительность между действиями «Начал» и «Завершил». */
+  actualHours?: number;
   price: number; // сумма за работу, ₽
   /** Стоимость доставки/подачи техники, ₽ */
   delivery?: number;
   paid: boolean;
 
   status: OrderStatus;
+  /** Времена действий рабочего процесса. */
+  startedAt?: string;
+  completedAt?: string;
+  paidAt?: string;
   notes?: string;
   createdAt: string;
   lat?: number;

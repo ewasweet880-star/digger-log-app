@@ -1,5 +1,12 @@
 import type { Expense, Order } from "./tracker-storage";
-import { getMonthRange, getWeekRange, isDateInRange, parseISODate, startOfDay } from "./date-utils";
+import {
+  getMonthRange,
+  getWeekRange,
+  isDateInRange,
+  parseISODate,
+  startOfDay,
+  toISODate,
+} from "./date-utils";
 
 export interface EarningsSummary {
   /** Amount for completed orders dated in the current month. */
@@ -23,6 +30,21 @@ export interface EarningsSummary {
   expensesMonth: number;
   fuelMonth: number;
   serviceMonth: number;
+}
+
+export interface DailyReport {
+  date: string;
+  scheduledCount: number;
+  plannedCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  earned: number;
+  received: number;
+  toReceive: number;
+  hours: number;
+  expenses: number;
+  fuelExpenses: number;
+  net: number;
 }
 
 export function orderAmount(order: Pick<Order, "price" | "delivery">) {
@@ -64,7 +86,7 @@ export function calculateEarnings(
       result.doneCount += 1;
       if (isDateInRange(order.date, month.start, month.endExclusive)) {
         result.earnedMonth += amount;
-        result.hoursMonth += order.hours || 0;
+        result.hoursMonth += order.actualHours ?? order.hours ?? 0;
       }
       if (isDateInRange(order.date, week.start, week.endExclusive)) {
         result.earnedWeek += amount;
@@ -92,4 +114,70 @@ export function calculateEarnings(
   }
 
   return result;
+}
+
+export function calculateDailyReport(
+  orders: Order[],
+  expenses: Expense[],
+  now = new Date(),
+): DailyReport {
+  const date = toISODate(now);
+  const report: DailyReport = {
+    date,
+    scheduledCount: 0,
+    plannedCount: 0,
+    inProgressCount: 0,
+    completedCount: 0,
+    earned: 0,
+    received: 0,
+    toReceive: 0,
+    hours: 0,
+    expenses: 0,
+    fuelExpenses: 0,
+    net: 0,
+  };
+
+  for (const order of orders) {
+    if (order.status === "cancelled") continue;
+    const amount = orderAmount(order);
+    if (order.date === date) {
+      report.scheduledCount += 1;
+      if (order.status === "planned") report.plannedCount += 1;
+      if (order.status === "in_progress") report.inProgressCount += 1;
+    }
+
+    if (wasCompletedOn(order, date)) {
+      report.completedCount += 1;
+      report.earned += amount;
+      report.hours += order.actualHours ?? order.hours ?? 0;
+      if (!order.paid) report.toReceive += amount;
+    }
+
+    if (order.paid && wasPaidOn(order, date)) report.received += amount;
+  }
+
+  for (const expense of expenses) {
+    if (expense.date !== date) continue;
+    report.expenses += expense.amount || 0;
+    if (expense.category === "fuel") report.fuelExpenses += expense.amount || 0;
+  }
+  report.net = report.earned - report.expenses;
+  return report;
+}
+
+function wasCompletedOn(order: Order, date: string) {
+  return (
+    order.status === "done" &&
+    (timestampIsOnDay(order.completedAt, date) || (!order.completedAt && order.date === date))
+  );
+}
+
+function wasPaidOn(order: Order, date: string) {
+  return timestampIsOnDay(order.paidAt, date) || (!order.paidAt && order.date === date);
+}
+
+function timestampIsOnDay(timestamp: string | undefined, date: string) {
+  if (!timestamp) return false;
+  const parsed = new Date(timestamp);
+  return !Number.isNaN(parsed.getTime()) && toISODate(parsed) === date;
 }
